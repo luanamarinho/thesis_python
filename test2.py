@@ -286,3 +286,19 @@ plt.title('TSNE Plot for combination [(50, 4, 0.1, 0.8, 0.8)]')
 plt.show()
 
 dump([combined_data, runtime, KL_divergence], 'combined_data[(50, 4, 0.1, 0.8, 0.8)].joblib')
+
+
+
+# Load back
+from joblib import load
+from utils.data_pretreatment import preprocess_sparse_matrix
+downsampled_sparse_loaded = load('data/downsampled_40000_sparse_gzip')
+print(downsampled_sparse_loaded.shape)
+
+data_file = gzip.GzipFile('data/data_preprocessed_4000_10HVG', "r"); expr_data_preprocessed = np.load(data_file)
+metadata = pd.read_csv('data/metadata_sampled.csv')
+
+
+affinity_cache = compute_affinities(X = expr_data_preprocessed,
+                                    perplexity_values = np.linspace(*(5, 90),num=18, dtype=int).tolist()
+                                    )
