@@ -1,0 +1,10 @@
+{
+    "id": "Task1_cloudCLI_json",
+    "commandLine": "/bin/bash -c 'apt-get update && apt-get install -y python3-pip && pip3 install numpy pandas opentsne scanpy joblib anndata && python3 /mnt/batch/tasks/fsmounts/data/test_task_azure.py'",
+    "userIdentity": {
+        "autoUser": {
+            "scope": "pool",
+            "elevationLevel": "admin"
+        }
+    }
+}

@@ -13,9 +13,9 @@ def main():
     try:
         # Load data
         data_file = gzip.GzipFile('/home/luana/workspace/data/data_preprocessed_40000_10HVG', "r"); expr_data_preprocessed = np.load(data_file)
-        np.random.seed(1234)
-        ind_to_sample = np.random.choice(expr_data_preprocessed.shape[0], size=2000, replace=False)
-        expr_data_preprocessed_sampled = expr_data_preprocessed[ind_to_sample]
+        #np.random.seed(1234)
+        #ind_to_sample = np.random.choice(expr_data_preprocessed.shape[0], size=30000, replace=False)
+        expr_data_preprocessed_sampled = expr_data_preprocessed  #[ind_to_sample]
         combination = [(5, 4, 0.1, 0.8, 0.5)]
         start_time= time.time()
         affinity_cache = compute_affinities(X=expr_data_preprocessed_sampled,

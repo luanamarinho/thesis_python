@@ -14,17 +14,17 @@ def main():
         # Load data
         data_file_path = '/mnt/cs-luana-marinho-gmail-com-100320037b715e57/data_preprocessed_40000_10HVG'
         data_file = gzip.GzipFile(data_file_path, "r"); expr_data_preprocessed = np.load(data_file)
-        np.random.seed(1234)
-        ind_to_sample = np.random.choice(expr_data_preprocessed.shape[0], size=2000, replace=False)
-        expr_data_preprocessed_sampled = expr_data_preprocessed[ind_to_sample]
+        #np.random.seed(1234)
+        #ind_to_sample = np.random.choice(expr_data_preprocessed.shape[0], size=2000, replace=False)
+        #expr_data_preprocessed_sampled = expr_data_preprocessed[ind_to_sample]
 
         # Compute affinities
         #np.linspace(5, 90, num=18, dtype=int).tolist()
         combination = [(5, 4, 0.1, 0.8, 0.5)]
         start_time= time.time()
-        affinity_cache = compute_affinities(X=expr_data_preprocessed_sampled,
+        affinity_cache = compute_affinities(X=expr_data_preprocessed,
                                             perplexity_values=[5])
-        pipeline = run_openTSNE_with_combinations(combination, X = expr_data_preprocessed_sampled, affinity_cache = affinity_cache, verbose=True)
+        pipeline = run_openTSNE_with_combinations(combination, X = expr_data_preprocessed, affinity_cache = affinity_cache, verbose=True)
         runtime_pipeline = time.time() - start_time
         
         # Save results

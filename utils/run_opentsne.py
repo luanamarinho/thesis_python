@@ -58,4 +58,6 @@ def run_openTSNE_with_combinations(combinations, X, affinity_cache, initializati
         # Append the results
         results.append((combo, embedding_df, runtime, KL_divergence, pipeline))
 
+        i += 1
+
     return results
