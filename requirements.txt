@@ -1,0 +1,6 @@
+pandas
+numpy
+opentsne
+scanpy
+joblib
+anndata

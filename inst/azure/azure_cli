@@ -1,0 +1,54 @@
+/mnt/batch/tasks/workitems/myjob_azurecli/job-1/task4/wd/test_task_azure.py
+/root/wd/test_task_azure.py
+
+
+/bin/bash -c "python3 test_task_azure.py"
+
+az batch task create --job-id myjob_azurecli --task-id task1_cli --command-line "/bin/bash -c 'printenv AZ_BATCH_TASK_WORKING_DIR'"
+output: /mnt/batch/tasks/workitems/myjob_azurecli/job-1/task1_cli/wd
+
+
+az batch task create --job-id myjob_azurecli --task-id task2_cli --command-line "/bin/bash -c 'printenv AZ_BATCH_NODE_MOUNTS_DIR'"
+output: /mnt/batch/tasks/fsmounts
+
+az batch task create --job-id myjob_azurecli --task-id task3_cli --command-line "/bin/bash -c 'ls /mnt/batch/tasks/fsmounts'"
+output: bfuse-data.log
+        bfuseconnect
+        data
+        datablobfusetmp
+
+
+az batch task create --job-id myjob_azurecli --task-id task4_cli --command-line "/bin/bash -c 'ls /mnt/batch/tasks/fsmounts/data'"
+output: ls: cannot access '/mnt/batch/tasks/fsmounts/data': Permission denied
+solve: Blobfuseoptions "-o allow_other"
+
+
+task1_elevation: via portal. command line: /bin/bash -c 'ls /mnt/batch/tasks/fsmounts/data' with elevation level Pool admin
+worked!!
+
+task3_evevation: via portal. command line: /bin/bash -c 'python3 /mnt/batch/tasks/fsmounts/data/check_access.py' with elevation level Pool admin
+no resources
+output: no numpy installed
+
+task4_elevaton: same base str, command line:
+/bin/bash -c 'apt-get update && apt-get install -y python3-pip && pip3 install numpy pandas && python3 /mnt/batch/tasks/fsmounts/data/check_access.py'
+worked with many warnings: figure out either a venv or custom image
+
+
+task5_elevaton: same base str, command line:
+/bin/bash -c 'apt-get update && apt-get install -y python3-pip && pip3 install numpy pandas opentsne scanpy joblib anndata && python3 /mnt/batch/tasks/fsmounts/data/run_pipelines_multiple_batch.py'
+worked with many warnings: figure out either a venv or custom image
+Seems fine. But the map points are not the same.
+
+task6_elevation: same, just uploading pre-calculated indices. See if result is the same. projection seems a little rotated
+
+task7_elevation: repeated same task, to check inner consistency. Verified
+
+task8_elevation: full data set
+
+task12_elev: multiple combinations
+/bin/bash -c 'apt-get update && apt-get install -y python3-pip && pip3 install numpy pandas opentsne scanpy joblib anndata && python3 /mnt/batch/tasks/fsmounts/data/run_pipelines_multiple_batch_full.py'
+again, previous version of script was run
+
+task13: changed script name
+/bin/bash -c 'apt-get update && apt-get install -y python3-pip && pip3 install numpy pandas opentsne scanpy joblib anndata && python3 /mnt/batch/tasks/fsmounts/data/run_pipelines_multiple_batch_full2.py'
