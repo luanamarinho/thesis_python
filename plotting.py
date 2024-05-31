@@ -9,8 +9,8 @@ ind_to_sample = np.random.choice(39970, size=20000, replace=False)
 
 output= load('output/pipeline_multiples_test2.joblib')
 output = load('output/pipeline_multiples_perp25_0-45.joblib')
-output = load('output/perp25/pipeline_multiples_perp25_137-180.joblib')
-metadata = pd.read_csv('data/metadata_sampled.csv')
+output = load('output/pipeline_multiples_perp65_20-40.joblib')
+metadata = pd.read_csv('inst/data/metadata_sampled.csv')
 
 len(output)
 len(output[0])
