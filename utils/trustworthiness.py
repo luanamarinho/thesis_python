@@ -19,6 +19,7 @@ def trustworthiness_ratio(dist_X, dist_embedded, min_k = 1, max_k = 70, metric =
     0.8451086956521738
     """
     T_k = []
+    C_k = []
     n_samples = dist_X.shape[0]
     if max_k >= n_samples / 2:
       raise ValueError(
@@ -57,11 +58,28 @@ def trustworthiness_ratio(dist_X, dist_embedded, min_k = 1, max_k = 70, metric =
         2.0 / (n_samples * k * (2.0 * n_samples - 3.0 * k - 1.0))
       )
       T_k.append(t)
+
+      continuity_score = 0
+      for i in range(n_samples):
+        set_high_dim = set(ind_X[i, :k])
+        set_low_dim = set(ind_X_embedded[i, :k])
+        U_i_k = set_low_dim - set_high_dim
+        if len(U_i_k) > 0:
+          ranks = np.array([np.where(ind_X[i] == j)[0][0] for j in U_i_k])
+          continuity_score += np.sum(ranks - k)
+      normalization_factor = 2 / (n_samples * k * (2 * n_samples - 3 * k - 1))
+      continuity_score = 1 - normalization_factor * continuity_score
+      C_k.append(continuity_score)
     
     median_first_25_percent = np.median(T_k[:int(0.25*max_k)])
     start_index = max_k - int(0.25*max_k)
     median_last_25_percent = np.median(T_k[start_index:])
     trustworthiness_ratio = median_last_25_percent/median_first_25_percent
-    return T_k, trustworthiness_ratio
+
+    median_first_25_percent_C = np.median(C_k[:int(0.25 * max_k)])
+    start_index_C = max_k - int(0.25 * max_k)
+    median_last_25_percent_C = np.median(C_k[start_index_C:])
+    continuity_ratio = median_last_25_percent_C / median_first_25_percent_C
+    return T_k, trustworthiness_ratio, C_k, continuity_ratio
 
 
