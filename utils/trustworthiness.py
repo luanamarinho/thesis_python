@@ -2,12 +2,19 @@ from sklearn.metrics import pairwise_distances
 from sklearn.neighbors import NearestNeighbors
 import numpy as np
 
-def trustworthiness_ratio(X, X_embedded, min_k = 1, max_k = 70, metric = 'precomputed', digits = 3):
+def trustworthiness_ratio(X, X_embedded, min_k = 1, max_k = 70, metric = 'precomputed'):
     """
-    
+    Parameters:
+    X: if metric = 'precomputed', a [n_samples, n_samples ]matrix-like object, ie, the distance matrix of the original data set.
+    X_embedded: the embedded lower-dimensional space
+    min_k: the minimum value of K in range of the k-NN to be visited
+    max_k: the maximum value of the in the same range.
+
     Examples
     --------
     >>> from sklearn.manifold import TSNE
+    >>> from sklearn.metrics import pairwise_distances
+    >>> import numpy as np
     >>> X = np.random.RandomState(42).random((100, 50))  # Example high-dimensional data
     >>> X_embedded = TSNE(n_components=2, random_state=42).fit_transform(X)
     >>> dist_X = pairwise_distances(X, metric='euclidean')
@@ -25,11 +32,10 @@ def trustworthiness_ratio(X, X_embedded, min_k = 1, max_k = 70, metric = 'precom
     dist_X = pairwise_distances(X, metric=metric)
     if metric == "precomputed":
         dist_X = dist_X.copy()
-    # we set the diagonal to np.inf to exclude the points themselves from
-    # their own neighborhood
+    # Diagonal is set to np.inf to exclude the points themselves from their own neighborhood
     np.fill_diagonal(dist_X, np.inf)
-    ind_X = np.argsort(dist_X, axis=1)
     # `ind_X[i]` is the index of sorted distances between i and other samples
+    ind_X = np.argsort(dist_X, axis=1)
     ind_X_embedded = (
         NearestNeighbors(n_neighbors=max_k)
         .fit(X_embedded)
@@ -57,7 +63,7 @@ def trustworthiness_ratio(X, X_embedded, min_k = 1, max_k = 70, metric = 'precom
     median_first_25_percent = np.median(T_k[:int(0.25*max_k)])
     start_index = max_k - int(0.25*max_k)
     median_last_25_percent = np.median(T_k[start_index:])
-    trustworthiness_ratio = round(median_last_25_percent/median_first_25_percent, ndigits=digits)
+    trustworthiness_ratio = median_last_25_percent/median_first_25_percent
     return (T_k, trustworthiness_ratio)
 
 
