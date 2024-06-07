@@ -1,66 +1,91 @@
-import numpy as np
-import pandas as pd
-from sklearn.metrics import pairwise_distances_chunked
-from sklearn.manifold import trustworthiness
+from time import time
+from utils.compute_metrics import compute_metrics
 
-def compute_distance_matrix_chunked(data, n_jobs=1):
-    n_samples = data.shape[0]
-    full_distance_matrix = np.zeros((n_samples, n_samples))
-
-    start_idx = 0
-    for chunk in pairwise_distances_chunked(data, n_jobs=n_jobs):
-        end_idx = start_idx + chunk.shape[0]
-        full_distance_matrix[start_idx:end_idx] = chunk
-        start_idx = end_idx
-
-    return full_distance_matrix
-
-def compute_knn_indices(distance_matrix, rm_1st_column = False):
-    # Get the indices of the k-nearest neighbors using np.argsort
-    indices = np.argsort(distance_matrix, axis=1)
-    if rm_1st_column:
-        indices = indices[:, 1:]
-    return indices
-
-def compute_trustworthiness_continuity(tsne_configuration, original_data, k, n_jobs=2):
-    # Compute the trustworthiness
-    trust = trustworthiness(original_data, tsne_configuration, n_neighbors=k)
-
-    # Compute the pairwise distance matrix for the original data in chunks
-    original_distance_matrix = compute_distance_matrix_chunked(original_data, n_jobs=n_jobs)
-
-    # Get the k-nearest neighbors indices for the original data
-    original_knn_indices = compute_knn_indices(original_distance_matrix, k)
-
-    # Compute the pairwise distance matrix for the t-SNE data in chunks
-    tsne_distance_matrix = compute_distance_matrix_chunked(tsne_configuration, n_jobs=n_jobs)
-
-    # Get the k-nearest neighbors indices for the t-SNE data
-    tsne_knn_indices = compute_knn_indices(tsne_distance_matrix, k)
-
-    # Compute continuity
-    n_samples = original_data.shape[0]
-    continuity = 0
-    for i in range(n_samples):
-        continuity += len(set(tsne_knn_indices[i]).intersection(set(original_knn_indices[i])))
-    continuity /= (n_samples * k)
-    
-    return trust, continuity
-
-def main(tsne_filepath, original_data_filepath, k=10, n_jobs=2):
-    # Load the t-SNE configuration
-    df_tsne = pd.read_csv(tsne_filepath, compression='gzip')
-    tsne_configuration = df_tsne.iloc[:, :2].values
-    
-    # Load the original high-dimensional data
-    df_original = pd.read_csv(original_data_filepath, compression='gzip')
-    original_data = df_original.values
-
-    # Compute the trustworthiness and continuity
-    trust, continuity = compute_trustworthiness_continuity(tsne_configuration, original_data, k, n_jobs)
-    
-    print(f"Trustworthiness: {trust}")
-    print(f"Continuity: {continuity}")
 
 # Example usage
-main('output/df_tsne_unique.csv', 'output/original_data.csv', k=10, n_jobs=2)
+#compute_metrics(df_tsne_filepath = 'output/df_tsne_unique.csv', dist_X_filepat = 'output/original_data.csv', max_k=100)
+
+start = time()
+output_all = compute_metrics(df_tsne_filepath="output/df_tsne_unique.csv", dist_X_filepath="C:\\Users\\luana\\Documents\\data\\dist_X.joblib", max_k=50)
+runtime = time() - start
+
+
+# Usage example
+output_all = compute_metrics(
+    df_tsne_filepath="output/df_tsne_unique.csv",
+    dist_X_filepath="C:\\Users\\luana\\Documents\\data\\dist_X.joblib",
+    min_k=1,
+    max_k=100,
+    chunk_size=1000
+)
+print(output_all)
+
+
+
+
+
+
+import numpy as np
+import pandas as pd
+from joblib import load
+import gzip
+from time import time
+from sklearn.metrics import pairwise_distances
+#from sklearn.manifold import trustworthiness
+from utils.trustworthiness_chunks import trustworthiness
+from utils.compute_distances import compute_distance_matrix_chunked
+
+
+def compute_metrics(dist_input_filepath, df_tsne_filepath, chunk_size=1000, min_k=1, max_k=50):
+  # Load input distance matrix
+  X = load(dist_input_filepath)
+  n_samples = X.shape[0]
+
+  # Load t-SNE maps and compute distances
+  df_tsne = pd.read_csv(df_tsne_filepath, compression='gzip')
+  df_tsne = df_tsne.iloc[:, 0:2] # testing first tsne map
+  X_embedded = compute_distance_matrix_chunked(df_tsne)
+
+  # Initialize variables to store trustworthiness results
+  T_k_aggregate = np.zeros(max_k - min_k + 1)
+
+  # Split data into chunks
+  chunks = [(X[i:i+chunk_size], X_embedded[i:i+chunk_size]) for i in range(0, len(df_tsne), chunk_size)]
+
+
+  # Compute trustworthiness for each chunk
+  for chunk in chunks:
+    # Compute trustworthiness for the chunk for each k
+    T_k_chunk = trustworthiness(chunk[0], chunk[1], min_k=min_k, max_k=max_k)
+
+    # Aggregate trustworthiness values for each k
+    T_k_aggregate += T_k_chunk
+
+  # Normalize the aggregated trustworthiness values
+  for k in range(min_k, max_k + 1):
+    T_k_aggregate[k - min_k] = 1.0 - T_k_aggregate[k - min_k] * (
+      2.0 / (n_samples * k * (2.0 * n_samples - 3.0 * k - 1.0))
+    )
+
+    return T_k_aggregate
+
+
+df_tsne_filepath="output/df_tsne_unique.csv"
+dist_input_filepath="C:\\Users\\luana\\Documents\\data\\dist_X.joblib"
+from utils.compute_metrics_1k import compute_metrics
+
+start = time()
+output = compute_metrics(dist_input_filepath=dist_input_filepath, df_tsne_filepath=df_tsne_filepath, max_k=2)
+runtime = time() - start
+output
+
+dist_input_filepath = "dist_X_toy.joblib"
+df_tsne_filepath = "X_embedded.csv"
+
+output = compute_metrics(dist_input_filepath=dist_input_filepath, df_tsne_filepath=df_tsne_filepath, max_k=2, chunk_size=50)
+output
+from sklearn.manifold import trustworthiness
+test = trustworthiness()
+
+
+
