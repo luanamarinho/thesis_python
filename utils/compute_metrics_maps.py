@@ -11,7 +11,7 @@ def compute_metrics_maps(dist_input_filepath, df_tsne_filepath, chunk_size=1000,
 
     # Load t-SNE maps
     df_tsne = pd.read_csv(df_tsne_filepath, compression='gzip', dtype=np.float32)
-    n_maps = 100 #df_tsne.shape[1] // 2  # Number of t-SNE maps (pairs of columns)
+    n_maps = 40 #df_tsne.shape[1] // 2  # Number of t-SNE maps (pairs of columns)
 
     # Initialize a list to store trustworthiness results for all maps
     trustworthiness_list = []

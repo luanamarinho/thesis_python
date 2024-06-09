@@ -1,7 +1,6 @@
-from sklearn.metrics import pairwise_distances
 import numpy as np
 
-def trustworthiness_chunks(dist_X, dist_embedded, k):
+def trustworthiness_chunks(dist_X, dist_embedded, k = 10):
     """
     Parameters:
     X: if metric = 'precomputed', a [n_samples, n_samples ]matrix-like object, ie, the distance matrix of the original data set.
