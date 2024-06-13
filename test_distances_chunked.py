@@ -1,7 +1,7 @@
 from sklearn.metrics import pairwise_distances_chunked
 #from utils.compute_metrics_1k import trustworthiness_chunks
 #from utils.trustworthiness_chunks_1k import trustworthiness_chunks
-from utils.trustworthiness_chunks_multik import trustworthiness_chunks_multik
+#from utils.trustworthiness_chunks_multik import trustworthiness_chunks_multik
 import numpy as np
 from joblib import load, dump
 import os
@@ -114,6 +114,7 @@ runtime = time() - start
 
 from sklearn.manifold import TSNE
 from sklearn.metrics import pairwise_distances
+import numpy as np
 
 # Generate random data
 data_X1 = np.random.RandomState(42).rand(800, 50)
@@ -130,6 +131,7 @@ dist_embedded.shape
 from utils.trustworthiness_chunks_multik import trustworthiness_chunks_multik
 output = trustworthiness_chunks_multik(dist_X=dist_X, dist_embedded=dist_embedded, k=[30, 300]) 
 output
+
 
 reduce_func_test = lambda chunk, start: process_chunk3(chunk, start, dist_X, k)
 #output = list(pairwise_distances_chunked(data, reduce_func=reduce_func, n_jobs=-1, working_memory=64)) 
@@ -149,3 +151,16 @@ print(trust)
 from sklearn.manifold import trustworthiness
 trustworthiness(X=data_X1, X_embedded=tsne_results, n_neighbors=30)
 trustworthiness(X=data_X1, X_embedded=tsne_results, n_neighbors=300)
+
+from utils.compute_trustworthiness_chunked import compute_trustworthines
+compute_trustworthines(dist_X=dist_X, data_tsne=tsne_results, k=[30,300])
+
+data_X.shape, data.shape
+compute_trustworthines(dist_X=data_X, data_tsne=data, k=[30,300])
+#array([0.63435042, 0.61001099])
+
+for i in range(0, df_tsne.shape[1], 2):
+    tsne_map = df_tsne.iloc[:, i:i+2].values  # Extract the TSNE map (2 columns)
+    result = compute_trustworthiness(dist_X, tsne_map, k_values)
+    results.append(result)
+    print(f"TSNE map columns {i} and {i+1} processed: {result}"
