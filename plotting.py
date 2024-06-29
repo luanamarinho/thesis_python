@@ -36,5 +36,20 @@ shepard stress
 shepard plots with samples of the distance matrices
 Laurens van der Maaten: point out mistake in error
 
+cross table of the unique values
+
+
+cross-table
+many plots
+dont show code..
+material
+explain parameters and metrics
+explain 93
+cluster with and without parameters
+clustering hierarchical dbscan
+endogeinty
+contact after defense
+
+    
 
 
