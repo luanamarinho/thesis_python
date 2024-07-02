@@ -9,7 +9,7 @@ from matplotlib.colors import ListedColormap
 from matplotlib.gridspec import GridSpec
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.inspection import PartialDependenceDisplay, permutation_importance
+from sklearn.inspection import PartialDependenceDisplay, permutation_importance,partial_dependence
 from sklearn.tree import DecisionTreeClassifier, plot_tree, export_text
 from sklearn.metrics import classification_report, confusion_matrix
 from statsmodels.nonparametric.smoothers_lowess import lowess
@@ -36,7 +36,7 @@ plt.show()
 #sns.pairplot(df_parameters_results.loc[:,parameters + outcomes])
 #plt.show()
 # Plotting multiple scatter plots
-def plot_scatter_with_regression(data, parameters, outcomes, regression_type=None, degree = 1):
+def plot_scatter_with_regression(data, parameters, outcomes, regression_type=None, alpha = 0.5, degree = 1):
     # Function for LOESS smoothing using scipy
     def lowess_smooth(x, y, frac=0.67):
         f = interp1d(x, y, kind='linear')
@@ -54,7 +54,7 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
             ax = axes[i, j]
             
             # Scatter plot
-            ax.scatter(data[parameter], data[outcome], label='Data')
+            ax.scatter(data[parameter], data[outcome], label='Data', alpha=alpha)
             
             # Fit regression line if specified
             if regression_type == 'polyfit':
@@ -90,7 +90,7 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
     plt.tight_layout()
     plt.show()
 
-plot_scatter_with_regression(df_parameters_results, parameters, outcomes, regression_type='polyfit', degree=2)
+plot_scatter_with_regression(df_parameters_results, parameters, outcomes, regression_type='polyfit', alpha=1, degree=2)
 
 
 # Group by outcomes and summarize
@@ -173,6 +173,9 @@ def RF_outcome(outcome, df, parameters_df):
   plt.suptitle(f'{outcome}') #, y=1.05) 
   plt.show()
 
+  
+
+
 RF_outcome(outcomes[0], df_parameters_results, parameters_df)
 RF_outcome(outcomes[1], df_parameters_results, parameters_df)
 
@@ -193,3 +196,71 @@ def plot_shap_interactions(modelRF, X_train, feature_names):
 # Example usage:
 # plot_shap_interactions(modelRF, X_train, parameters)
 
+
+
+
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+
+# Assume df_parameters_results is your DataFrame
+#parameters = ['Perplexity', 'Early_exaggeration', 'Initial_momentum', 'Final_momentum', 'Theta']
+#outcomes = ['Shepard_stress', 'Trustworthiness_k1', 'Trustworthiness_k2', 'KL_divergence']
+
+X = df_parameters_results[parameters]
+y = df_parameters_results[outcomes]
+
+# PolynomialFeatures to include interactions and quadratic terms
+poly = PolynomialFeatures(degree=2, interaction_only=False, include_bias=False)
+X_poly = poly.fit_transform(X)
+poly_feature_names = poly.get_feature_names_out(parameters)
+
+# Update the column names in the DataFrame
+X_poly_df = pd.DataFrame(X_poly, columns=poly_feature_names)
+
+# Split data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X_poly_df, y, test_size=0.2, random_state=42)
+
+# Print the updated feature names
+print(poly_feature_names)
+
+
+
+
+pd_result_pair = partial_dependence(modelRF, features=[0,1], X=parameters_df,grid_resolution=50)
+
+# Extract partial dependence values for the pair
+pd_values_pair = pd_result_pair['average']
+
+# Compute partial dependence for individual features
+pd_result_perplexity = partial_dependence(modelRF, features=[0], X=parameters_df, grid_resolution=50)
+pd_result_early_exaggeration = partial_dependence(modelRF, features=[1], X=parameters_df, grid_resolution=50)
+
+pd_values_perplexity = pd_result_perplexity['average'][0]
+pd_values_early_exaggeration = pd_result_early_exaggeration['average'][0]
+
+# Compute the range (variation) in the joint partial dependence
+pd_variation_pair = np.max(pd_values_pair) - np.min(pd_values_pair)
+
+# Compute the ranges (variations) in the individual partial dependencies
+pd_variation_perplexity = np.max(pd_values_perplexity) - np.min(pd_values_perplexity)
+pd_variation_early_exaggeration = np.max(pd_values_early_exaggeration) - np.min(pd_values_early_exaggeration)
+
+# Compute the pair-wise interaction measure
+interaction_measure_pair = pd_variation_pair / (pd_variation_perplexity + pd_variation_early_exaggeration)
+
+print(f"Pair-wise interaction measure for 'Perplexity' and 'Early_exaggeration': {interaction_measure_pair}")
+
+
+# Compute partial dependence for Perplexity (feature j)
+PD_j = partial_dependence(modelRF, features=[0], X=parameters_df, grid_resolution=50)
+PD_j = PD_j['average'][0]
+
+# Compute partial dependence for Early_exaggeration (feature k)
+PD_k = partial_dependence(modelRF, features=[1], X=parameters_df, grid_resolution=50)
+PD_k = PD_k['average'][0]
+
+# Compute 2-way partial dependence function PD_jk
+pd_result_pair = partial_dependence(modelRF, features=[0,1], X=parameters_df,grid_resolution=50)
+pd_values_pair = pd_result_pair['average'][0]
+  
