@@ -2,8 +2,8 @@ import argparse
 import logging
 from utils.affinities_cache import compute_affinities
 from utils.run_opentsne_momentum import run_openTSNE_with_combinations
-from utils.parameters_combination import generate_combinations
-from joblib import dump
+from utils.parameters_combination_granular import generate_combinations
+from joblib import dump, load
 import gzip
 import numpy as np
 import time
@@ -33,7 +33,7 @@ def tsne_pipelines(perplexity: int, lower_bound: int, upper_bound: int, sampled:
         runtime_affinity: Time taken to compute affinities.
     """
     
-    assert perplexity in {5, 25, 45, 65, 90}, f"Invalid value: {perplexity}. Allowed values are [5, 25, 45, 65, 90]."
+    #assert perplexity in {5, 25, 45, 65, 90}, f"Invalid value: {perplexity}. Allowed values are [5, 25, 45, 65, 90]."
     
     try:
         # Load data
@@ -46,20 +46,20 @@ def tsne_pipelines(perplexity: int, lower_bound: int, upper_bound: int, sampled:
             expr_data_preprocessed = expr_data_preprocessed[ind_to_sample]
 
         # Generate combinations
-        combinations = generate_combinations(perplexity)
-        combinations_BH = [comb for comb in combinations if comb[-1] != 0]
+        combinations = load('output/parameter_combinations.joblib')
+        combinations_BH = [comb for comb in combinations if comb[-1] >= 0.1]
         combinations_BH_run = combinations_BH[lower_bound:upper_bound]
 
         # Compute affinities
-        start_time = time.time()
-        affinity_cache = compute_affinities(X=expr_data_preprocessed, perplexity_values=[perplexity])
-        runtime_affinity = time.time() - start_time
+        #start_time = time.time()
+        #affinity_cache = compute_affinities(X=expr_data_preprocessed, perplexity_values=[perplexity])
+        #runtime_affinity = time.time() - start_time
 
         # Run t-SNE with combinations
-        pipelines = run_openTSNE_with_combinations(combinations_BH_run, X=expr_data_preprocessed, affinity_cache=affinity_cache, verbose=True)
+        pipelines = run_openTSNE_with_combinations(combinations_BH_run, X=expr_data_preprocessed, verbose=True)
 
         # Save results
-        output = (pipelines, runtime_affinity)
+        output = (pipelines)
         result_file_path = os.path.join("output", f"pipeline_multiples_perp{perplexity}_{lower_bound}-{upper_bound}_debug.joblib")
         dump(output, result_file_path)
 

@@ -1,5 +1,11 @@
 import numpy as np
-def generate_combinations(perplexity, early_exagg_range = (4, 32), theta_range = (0, 1.0)):
+def generate_combinations(perplexity,
+                          early_exagg_range = (4, 32),
+                          theta_range = (0, 1.0),
+                          initial_momem_range = (0.1, 0.5),
+                          final_momem_range = (0.8, 1),
+
+                    num_combinations = 600):
     """
     Generate combinations of parameters based on specified ranges.
 
@@ -16,10 +22,10 @@ def generate_combinations(perplexity, early_exagg_range = (4, 32), theta_range =
         raise ValueError("Perplexity must be one of [5, 25, 45, 65, 90]")
 
     perplexity_values = [perplexity]
-    early_exagg_values = np.linspace(*early_exagg_range, num=5, dtype=int).tolist()
-    theta_values = np.round(np.linspace(*theta_range, num=5, dtype=float), 2).tolist()
-    initial_momentum_values = [0.1, 0.3, 0.5]
-    final_momentum_values = [0.8, 0.9, 1.0]
+    early_exagg_values = np.linspace(*early_exagg_range, num=num_combinations//5).tolist()
+    theta_values = np.round(np.linspace(*theta_range, num=num_combinations//5, dtype=float), 2).tolist()
+    initial_momentum_values = np.linspace(*initial_momem_range, num=num_combinations//5).tolist()
+    final_momentum_values = np.linspace(*final_momem_range, num=num_combinations//5).tolist()
 
     # Generate combinations
     combinations = []

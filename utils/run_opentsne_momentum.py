@@ -2,7 +2,7 @@ import time
 import pandas as pd
 import openTSNE
 
-def run_openTSNE_with_combinations(combinations, X, affinity_cache, initialization='random', n_jobs=1, 
+def run_openTSNE_with_combinations(combinations, X, initialization='random', n_jobs=1, 
                                    negative_gradient_method='BH', random_state=1234, 
                                    n_iter=750, verbose=False, dof=1):
     """
@@ -23,13 +23,12 @@ def run_openTSNE_with_combinations(combinations, X, affinity_cache, initializati
     for combo in combinations:
         perplexity, early_exagg, initial_momentum, final_momentum, theta = combo
 
-        # Get pre-computed affinities from cache
-        affinities = affinity_cache[perplexity]
-
         # Create TSNE object with the provided parameters
         tsne = openTSNE.TSNE(
             perplexity=perplexity,
             early_exaggeration=early_exagg,
+            initial_momentum=initial_momentum,
+            final_momentum=final_momentum,
             initialization=initialization,
             n_jobs=n_jobs,
             negative_gradient_method=negative_gradient_method,
@@ -43,7 +42,7 @@ def run_openTSNE_with_combinations(combinations, X, affinity_cache, initializati
         start_time = time.time()
 
         # Fit TSNE with cached affinities
-        embedding = tsne.fit(affinities=affinities)
+        embedding = tsne.fit(X)
         
         runtime = time.time() - start_time
         
@@ -56,7 +55,7 @@ def run_openTSNE_with_combinations(combinations, X, affinity_cache, initializati
         KL_divergence = embedding.kl_divergence
         
         # Append the results
-        results.append((combo, embedding_df, runtime, KL_divergence, pipeline))
+        results.append((combo, embedding_df, runtime, KL_divergence)) #, pipeline))
 
         i += 1
 
