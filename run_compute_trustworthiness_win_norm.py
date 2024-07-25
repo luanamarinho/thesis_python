@@ -23,8 +23,8 @@ def run_compute_metrics(folder = "C:/Users/luana/Documents/data", start_index = 
   # Pre-allocate a np memmap output array
   num_tsne_maps = (end_index - start_index) // 2
 
-  output_filename_trust = os.path.join(folder, f'output_memmap_trust_{"toy" if toy_data else "real"}_{start_index}_{end_index}.dat')
-  output_filename_stress = os.path.join(folder, f'output_memmap_stress_{"toy" if toy_data else "real"}_{start_index}_{end_index}.dat')
+  output_filename_trust = os.path.join(folder, f'output_memmap_trust_{"toy" if toy_data else "real"}_{start_index}_{end_index}_momentum.dat')
+  output_filename_stress = os.path.join(folder, f'output_memmap_stress_{"toy" if toy_data else "real"}_{start_index}_{end_index}_momentum.dat')
 
   output_trust = np.memmap(output_filename_trust, dtype='float64', shape=(num_tsne_maps, len(k)), mode='w+')
   output_stress = np.memmap(output_filename_stress, dtype='float64', shape=(num_tsne_maps,), mode='w+')
