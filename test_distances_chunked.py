@@ -7,15 +7,22 @@ from joblib import load, dump
 import os
 import sys
 from time import time
+import gzip
 
 # Example dataset with 39970 rows and 2 columns
 #folder =  "/home/luana/Documents/thesis_data"
 folder = "C:/Users/luana/Documents/data"
 #data = np.random.rand(39970, 2)
 #dump(data, os.path.join(folder,"df_tsne.joblib"))
-data_tsne = load(os.path.join(folder,"df_tsne.joblib"), mmap_mode='r')
-data = data_tsne[:,:2]
-sys.getsizeof(data) #160
+
+# Dist input data
+data_file_path = 'C:/Users/luana/Documents/data/data_preprocessed_5000_10HVG'#'/home/luana/workspace/data/data_preprocessed_40000_10HVG'
+#with gzip.GzipFile(data_file_path, "r") as data_file:
+#  data = np.load(data_file)
+data = load('output/df_tsne_momentum.joblib.gz')
+#data_tsne = load(os.path.join(folder,"df_tsne.joblib"), mmap_mode='r')
+#data = data_tsne[:,:2]
+sys.getsizeof(data) #39402164 for tsne maps and 134086328 for input data
 
 # Define a function to process each chunk
 def process_chunk(chunk, start):
@@ -31,24 +38,25 @@ def process_chunk(chunk, start):
 #working_memory Parameter: Specifies the size of the chunks (in MiB) to use during the computation. Adjust this based on your system's memory capacity.
 # sklearn.get_config()['working_memory'] = 1024 by default
 result_chunks = list(pairwise_distances_chunked(data, reduce_func=process_chunk, n_jobs=-1)) #working_memory=64
-sys.getsizeof(result_chunks) #184
-len(result_chunks) #12
-result_chunks_tsne = result_chunks
-del result_chunks
+sys.getsizeof(result_chunks) #88
+len(result_chunks) #1
+#result_chunks_tsne = result_chunks
+#del result_chunks
 
-D_chunk_tsne = next(pairwise_distances_chunked(data, reduce_func=process_chunk, n_jobs=-1, working_memory=64))
-D_chunk_tsne.shape #(209, 39970) with memory 64
+#D_chunk_tsne = next(pairwise_distances_chunked(data, reduce_func=process_chunk, n_jobs=-1, working_memory=64))
+#D_chunk_tsne.shape #(209, 39970) with memory 64
 
 # To collect all chunks into a full distance matrix (if needed)
 start = time()
 distance_matrix = np.vstack(result_chunks)
 time() - start # 104
-sys.getsizeof(distance_matrix) #12780807328 size of full loaded distance matrix
-del distance_matrix
+sys.getsizeof(distance_matrix) #198005128 size of full loaded distance matrix of X
+#del distance_matrix
+#dump(distance_matrix, "C:/Users/luana/Documents/data/dist_X_5000.joblib")
 
 
 #dist_input_filepath = "/home/luana/Documents/thesis_data/dist_X.joblib"
-dist_input_filepath = "C:/Users/luana/Documents/data/dist_X.joblib"
+dist_input_filepath = "C:/Users/luana/Documents/data/dist_X_5000.joblib"
 
 data_X = load(dist_input_filepath, mmap_mode='r')
 
@@ -343,6 +351,10 @@ from utils.compute_trust_stress_chunked import compute_stress_trust
 compute_stress_trust(dist_X=dist_X, data_tsne=mds_transformed,k=[30,300]) #(array([0.58640971, 0.65650149]), 0.40459501846416124, 434479.06333569647)
 trust, stress,_ = compute_stress_trust(dist_X=dist_X, data_tsne=mds_transformed,k=[30,300])
 result = np.concatenate([trust, [stress]])
+
+from utils.compute_trust_stress_chunked_norm import compute_stress_trust
+compute_stress_trust(dist_X=dist_X, data_tsne=mds_transformed,k=[30,300]) #(array([0.58640971, 0.65650149]), 0.40459501846416124, 434479.06333569647)
+
 
 # Testing run_compute
 dist_X.__class__
