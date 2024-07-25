@@ -11,8 +11,8 @@ import argparse
 def run_compute_metrics(folder = "C:/Users/luana/Documents/data", start_index = 0, end_index = None, k = [30,300], toy_data = False):
   # Load the input distance matrix and the tsne maps
   if not toy_data:
-    dist_X = load(os.path.join(folder,"dist_X.joblib"), mmap_mode='r')
-    data_tsne = load(os.path.join(folder,"df_tsne.joblib"), mmap_mode='r')
+    dist_X = load(os.path.join(folder,"dist_X_5000.joblib"), mmap_mode='r')
+    data_tsne = load(os.path.join(folder,"df_tsne_momentum.joblib"), mmap_mode='r')
   elif toy_data:
     dist_X = load(os.path.join('output',"dist_X_toy.joblib"), mmap_mode='r')
     data_tsne = load(os.path.join('output',"data_mds_toy.joblib"), mmap_mode='r')
