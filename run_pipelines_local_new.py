@@ -16,7 +16,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def tsne_pipelines(perplexity: int, lower_bound: int, upper_bound: int, sampled: bool = False):
+def tsne_pipelines(lower_bound: int, upper_bound: int, sampled: bool = False):
     """
     Produces t-SNE BH embeddings for multiple pipelines, derived from the tuples of parameter combinations
     (theta, initial momentum, final momentum, early exaggeration), for a fixed perplexity value.
@@ -60,21 +60,20 @@ def tsne_pipelines(perplexity: int, lower_bound: int, upper_bound: int, sampled:
 
         # Save results
         output = (pipelines)
-        result_file_path = os.path.join("output", f"pipeline_multiples_perp{perplexity}_{lower_bound}-{upper_bound}_debug.joblib")
+        result_file_path = os.path.join("output", f"pipeline_multiples_{lower_bound}-{upper_bound}_debug_new.joblib")
         dump(output, result_file_path)
 
-        logging.info("Script executed successfully with perplexity %d, lower_bound %d, upper_bound %d", perplexity, lower_bound, upper_bound)
+        logging.info("Script executed successfully with lower_bound %d, upper_bound %d", lower_bound, upper_bound)
 
     except Exception as e:
         logging.error("An error occurred: %s", str(e), exc_info=True)  # exc_info=True logs the traceback
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run t-SNE pipelines with specified parameters.")
-    parser.add_argument("--perplexity", type=int, required=True, choices=[5, 25, 45, 65, 90], help="t-SNE perplexity (must be one of [5, 25, 45, 65, 90])")
     parser.add_argument("--lower_bound", type=int, required=True, help="Lower bound index for the set of tuples.")
     parser.add_argument("--upper_bound", type=int, required=True, help="Upper bound index for the set of tuples.")
     parser.add_argument("--sampled", action='store_true', help="If set, the input data will be randomly downsampled to 100 observations.")
     
     args = parser.parse_args()
     
-    tsne_pipelines(perplexity=args.perplexity, lower_bound=args.lower_bound, upper_bound=args.upper_bound, sampled=args.sampled)
+    tsne_pipelines(lower_bound=args.lower_bound, upper_bound=args.upper_bound, sampled=args.sampled)
