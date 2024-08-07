@@ -3,7 +3,7 @@ import numpy as np
 import time
 from memory_profiler import memory_usage
 from utils.compute_trustworthiness_chunked import compute_trustworthiness
-from utils.compute_trust_stress_chunked_norm import compute_stress_trust
+from utils.compute_trust_stress_chunked import compute_stress_trust
 from joblib import Parallel, delayed, load
 import os
 import argparse
@@ -36,7 +36,7 @@ def run_compute_metrics(folder = "C:/Users/luana/Documents/data", start_index = 
 
   # Parallel processing with joblib 
   #Parallel(n_jobs=-1)(delayed(process_tsne_map)(i, output, data_tsne, dist_X, k, start_index) for i in range(start_index, end_index, 2))
-  Parallel(n_jobs=-1)(delayed(process_tsne_map)(i, output_trust, output_stress, data_tsne, dist_X, k, start_index) for i in range(start_index, end_index, 2))
+  Parallel(n_jobs=1)(delayed(process_tsne_map)(i, output_trust, output_stress, data_tsne, dist_X, k, start_index) for i in range(start_index, end_index, 2))
 
   # Sync memmap arrays to disk
   output_trust.flush()
@@ -87,7 +87,8 @@ if __name__ == "__main__":
 
 
 # Load the results from the memmap file for further processing or analysis
-#output = np.memmap(output_filename_memmap, dtype='float64', shape=(num_tsne_maps, len(k_values)), mode='r')
+#output_trust = np.memmap(output_filename_trust, dtype='float64', shape=(num_tsne_maps, len(k)), mode='r')
+#output_stress = np.memmap(output_filename_stress, dtype='float64', shape=(num_tsne_maps,), mode='r')
 
 #Print all results
 #for idx, res in enumerate(output):
