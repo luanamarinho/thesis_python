@@ -12,7 +12,7 @@ def preprocess_sparse_matrix(data_sp_csr_HVG):
         numpy.ndarray: Preprocessed dense matrix.
     """
     data_dense = data_sp_csr_HVG.toarray()
-    data_normalized = normalize(data_dense, norm='l2', axis=1)
+    data_normalized = normalize(data_dense, norm='l1', axis=1)
 
     # Log transform the data
     data_log_transformed = np.log1p(data_normalized)  # Apply log(1+x) transformation to avoid log(0)
