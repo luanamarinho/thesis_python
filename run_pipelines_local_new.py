@@ -46,7 +46,10 @@ def tsne_pipelines(lower_bound: int, upper_bound: int, sampled: bool = False):
             expr_data_preprocessed = expr_data_preprocessed[ind_to_sample]
 
         # Generate combinations
-        combinations = load('output/parameter_combinations.joblib')
+        #combinations = load('output/parameter_combinations.joblib') #used for the 495 combinations
+        #combinations_BH = [comb for comb in combinations if comb[-1] >= 0.1]
+        #combinations_BH_run = combinations_BH[lower_bound:upper_bound]
+        combinations = load('output/tsne_parameter_combinations_IM_test.joblib') #used for testing IM
         combinations_BH = [comb for comb in combinations if comb[-1] >= 0.1]
         combinations_BH_run = combinations_BH[lower_bound:upper_bound]
 
@@ -60,7 +63,7 @@ def tsne_pipelines(lower_bound: int, upper_bound: int, sampled: bool = False):
 
         # Save results
         output = (pipelines)
-        result_file_path = os.path.join("output", f"pipeline_multiples_{lower_bound}-{upper_bound}_debug_new.joblib")
+        result_file_path = os.path.join("output", f"pipeline_multiples_{lower_bound}-{upper_bound}_debug_new_test_IM.joblib")
         dump(output, result_file_path)
 
         logging.info("Script executed successfully with lower_bound %d, upper_bound %d", lower_bound, upper_bound)
