@@ -19,8 +19,9 @@ gene_cutoff = 500
 mito_cutoff = 0.2
 max_nbr_samples = 5000
 seed = 42
-save_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'matrix.mtx')
 save_metadata_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'downsampled_metadata.csv')
+file_sparse = f'downsampled_{max_nbr_samples}_sparse_gzip.pkl.gz'
+save_sparse_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', file_sparse)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -81,6 +82,7 @@ def downsample_data(data_sparse_qc, metadata_qc):
     
     downsampled_sparse_data = data_sparse_qc[ind_rows_downsample]
     metadata_sampled = metadata_qc.iloc[ind_rows_downsample, :]
+    metadata_sampled.name = 'downsampled_metadata'
     
     logging.info(f'Shape of Downsampled gene expression data: {downsampled_sparse_data.shape}')
     logging.info(f'Shape of Metadata: {metadata_sampled.shape}')
@@ -91,21 +93,37 @@ def downsample_data(data_sparse_qc, metadata_qc):
 def feature_selection(downsampled_sparse_data):
     """Select highly variable genes (HVG)."""
     data_sp_csr_HVG = slice_data_HVG(downsampled_sparse_data, perc_top_genes=0.1)
+    data_sp_csr_HVG.name = 'downsampled_sparse_data_HVG'
     logging.info(f'Shape of raw data after feature selection: {data_sp_csr_HVG.shape}')
     logging.info(f'Class of raw data after feature selection: {data_sp_csr_HVG.__class__}')
     return data_sp_csr_HVG
 
+def normLogTransformScale(data_sp_csr_HVG):
+    """Normalize, log-transform, and scale the data."""
+    normLogTransformScale_data = preprocess_sparse_matrix(data_sp_csr_HVG)
+    normLogTransformScale_data.name = 'normScaleLogTransform_data'
+    logging.info(f'Shape of data after normalization, log transformation, and scaling: {normLogTransformScale_data.shape}')
+    logging.info(f'Class of data after normalization,  log transformation, and scaling: {normLogTransformScale_data.__class__}')
+
+
 def save_data(data, metadata, save_data_path, save_metadata_path):
     """Save the downsampled data and metadata to files."""
-    # Save the data matrix
-    dump(data, save_data_path)
-    data_name = getattr(data, 'name', 'preprocessed_data')
-    logging.info(f'Data matrix {data_name} saved to {save_data_path}')
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(save_data_path), exist_ok=True)
+    os.makedirs(os.path.dirname(save_metadata_path), exist_ok=True)
     
-    # Save the metadata
-    metadata.to_csv(save_metadata_path, index=False)
-    metadata_name = getattr(metadata, 'name', 'preprocessed_metadata')
-    logging.info(f'Metadata {metadata_name} saved to {save_metadata_path}')
+    try:
+        # Save the data matrix
+        dump(data, save_data_path, compress=('gzip', 3))
+        data_name = getattr(data, 'name', 'preprocessed_data')
+        logging.info(f'Data matrix {data_name} saved to {save_data_path}')
+        
+        # Save the metadata
+        metadata.to_csv(save_metadata_path, index=False)
+        metadata_name = getattr(metadata, 'name', 'preprocessed_metadata')
+        logging.info(f'Metadata {metadata_name} saved to {save_metadata_path}')
+    except Exception as e:
+        logging.error(f'Error saving data: {e}')
 
 def main():
     """Main function to run the preprocessing workflow."""
@@ -113,7 +131,7 @@ def main():
     data_sparse_qc, metadata_qc = quality_control(data_sparse, metadata, gene_data)
     downsampled_sparse_data, metadata_sampled = downsample_data(data_sparse_qc, metadata_qc)
     data_sp_csr_HVG = feature_selection(downsampled_sparse_data)
-    save_data(data_sp_csr_HVG, metadata_sampled, 'downsampled_data.pkl', 'downsampled_metadata.csv')
+    save_data(data_sp_csr_HVG, metadata_sampled, save_sparse_data_path, save_metadata_path)
 
 if __name__ == "__main__":
     main()
