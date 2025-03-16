@@ -17,7 +17,7 @@ grouping_columns = ['CellFromTumor', 'PatientNumber', 'TumorType', 'TumorSite', 
 umi_cutoff = 1000
 gene_cutoff = 500
 mito_cutoff = 0.2
-max_nbr_samples = 5000
+max_nbr_samples = 500
 seed = 42
 save_metadata_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'downsampled_metadata.csv')
 file_sparse = f'downsampled_{max_nbr_samples}_sparse_gzip.pkl.gz'
@@ -97,30 +97,37 @@ def feature_selection(downsampled_sparse_data):
     logging.info(f'Number of identified highly variable genes: {len(indices_HVG)}')
     return indices_HVG
 
-def normLogTransformScale(data_sp_csr_HVG):
+def normLogTransformScale(data_sp_csr_HVG, HVG_indices):
     """Pooling-based cell normalize, log-transformation, selection of the HVG, and z-score scaling."""
-    normLogTransformScale_data = preprocess_sparse_matrix(data_sp_csr_HVG)
-    normLogTransformScale_data.name = 'normScaleLogTransform_data'
-    logging.info(f'Shape of data after normalization, log transformation, and scaling: {normLogTransformScale_data.shape}')
-    logging.info(f'Class of data after normalization,  log transformation, and scaling: {normLogTransformScale_data.__class__}')
+    normLogTransformScale_data = preprocess_sparse_matrix(data_sp_csr_HVG, HVG_indices)
+    normLogTransformScale_data.name = 'LogNormalizedScaledData'
+    logging.info(f'Shape of data after log-normalization and scaling: {normLogTransformScale_data.shape}')
+    logging.info(f'Class of data after log-normalization and scaling: {normLogTransformScale_data.__class__}')
 
 
-def save_data(data, metadata, save_data_path, save_metadata_path):
-    """Save the downsampled data and metadata to files."""
+def save_data(data, metadata=None, save_data_path=None, save_metadata_path=None):
+    """Save data to file."""
     # Ensure the directory exists
-    os.makedirs(os.path.dirname(save_data_path), exist_ok=True)
-    os.makedirs(os.path.dirname(save_metadata_path), exist_ok=True)
+    if save_data_path:
+        os.makedirs(os.path.dirname(save_data_path), exist_ok=True)
+    else:
+        logging.info('No save path provided for data. Data will be saved to the default directory.')
+        save_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'preprocessed_data.pkl.gz')
+    
+    if metadata and save_metadata_path:
+        os.makedirs(os.path.dirname(save_metadata_path), exist_ok=True)
     
     try:
-        # Save the data matrix
+        # Save the data matrix with gzip compression
         dump(data, save_data_path, compress=('gzip', 3))
         data_name = getattr(data, 'name', 'preprocessed_data')
         logging.info(f'Data matrix {data_name} saved to {save_data_path}')
         
         # Save the metadata
-        metadata.to_csv(save_metadata_path, index=False)
-        metadata_name = getattr(metadata, 'name', 'preprocessed_metadata')
-        logging.info(f'Metadata {metadata_name} saved to {save_metadata_path}')
+        if metadata and save_metadata_path:
+            metadata.to_csv(save_metadata_path, index=False)
+            metadata_name = getattr(metadata, 'name', 'preprocessed_metadata')
+            logging.info(f'Metadata {metadata_name} saved to {save_metadata_path}')
     except Exception as e:
         logging.error(f'Error saving data: {e}')
 
@@ -129,8 +136,11 @@ def main():
     data_sparse, metadata, gene_data = load_data()
     data_sparse_qc, metadata_qc = quality_control(data_sparse, metadata, gene_data)
     downsampled_sparse_data, metadata_sampled = downsample_data(data_sparse_qc, metadata_qc)
-    data_sp_csr_HVG = feature_selection(downsampled_sparse_data)
-    save_data(data_sp_csr_HVG, metadata_sampled, save_sparse_data_path, save_metadata_path)
+    save_data(downsampled_sparse_data, metadata_sampled, save_sparse_data_path, save_metadata_path)
+    indices_HVG_genes = feature_selection(downsampled_sparse_data)
+    logNormalized_HVG_subset = normLogTransformScale(downsampled_sparse_data, indices_HVG_genes, scale=True)
+    save_data(logNormalized_HVG_subset,
+              save_data_path=os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'logNormalized_HVG_subset.pkl.gz'))
 
 if __name__ == "__main__":
     main()

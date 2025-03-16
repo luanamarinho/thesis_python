@@ -6,14 +6,16 @@ from rpy2.robjects.packages import importr
 from rpy2.robjects.conversion import localconverter
 from rpy2.robjects import numpy2ri
 
-def preprocess_sparse_matrix(data_sp_csr_HVG):
+def preprocess_sparse_matrix(sparse_input, HVG_indices, scale=True):
     """
     Preprocesses a sparse matrix by cell normalizing, log-transforming, and scaling features.
     
     Parameters:
-        data_sparse (scipy.sparse.csr_matrix): Input sparse matrix to be preprocessed.        
+        sparse_input (scipy.sparse.csr_matrix): Input sparse matrix to be preprocessed.
+        HVG_indices (pd.Series boolean): boolean indicator of highly-variable genes.
+        scale (bool): If True, the log-normalized and sliced data is also z-score scaled.
     Returns:
-        numpy.ndarray: Preprocessed dense matrix.
+        numpy.ndarray: Log-normalized subset with identified HVG. If scale is True, the subset is z-score scaled.
     """
 
     scran = importr('scran')
@@ -22,7 +24,7 @@ def preprocess_sparse_matrix(data_sp_csr_HVG):
     Matrix = importr('Matrix')
 
     with localconverter(ro.default_converter + numpy2ri.converter):
-        r_matrix = Matrix.Matrix(data_sp_csr_HVG.toarray(), sparse=True)
+        r_matrix = Matrix.Matrix(sparse_input.toarray(), sparse=True)
 
     sce = SingleCellExperiment.SingleCellExperiment(assays=ro.ListVector({'counts': r_matrix}))
     clusters = scran.quickCluster(sce)
@@ -31,8 +33,10 @@ def preprocess_sparse_matrix(data_sp_csr_HVG):
 
     norm_log_counts = ro.r['assay'](sce, 'logcounts')
     data_log_transformed = np.array(norm_log_counts)
+    data_log_transformed = data_log_transformed[:, HVG_indices]
 
-    # Scale the data (z-score normalization)
+    if not scale:
+        return data_log_transformed
     scaler = StandardScaler()
     data_scaled = scaler.fit_transform(data_log_transformed)
 
