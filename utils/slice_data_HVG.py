@@ -10,11 +10,11 @@ def slice_data_HVG(expr_data, perc_top_genes = 0.1):
     - perc_top_genes: Float indicating the percentage of the top HVG genes to be retrieved.
 
     Returns:
-    - A sliced expression data matrix with only the n_top HVG.
+    - A sliced expression data matrix with only the n_top HVG and a boolean array indicating the HVG genes.
     """
     adata = AnnData(X = expr_data)
     sc.pp.highly_variable_genes(adata, n_top_genes=int(perc_top_genes * adata.shape[1]), flavor='seurat_v3')
     highly_variable_genes = adata.var['highly_variable']
     sliced_X = adata.X[:, highly_variable_genes]
 
-    return sliced_X
+    return sliced_X, highly_variable_genes

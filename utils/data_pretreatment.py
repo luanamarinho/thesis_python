@@ -1,22 +1,36 @@
 import numpy as np
-from sklearn.preprocessing import normalize, StandardScaler
+from sklearn.preprocessing import StandardScaler
+import rpy2.robjects as ro
+from rpy2.robjects import pandas2ri
+from rpy2.robjects.packages import importr
+from rpy2.robjects.conversion import localconverter
+from rpy2.robjects import numpy2ri
 
-def preprocess_sparse_matrix(data_sp_csr_HVG, normalization='l1'):
+def preprocess_sparse_matrix(data_sp_csr_HVG):
     """
-    Preprocesses a sparse matrix by normalizing, log-transforming, and scaling its values.
+    Preprocesses a sparse matrix by cell normalizing, log-transforming, and scaling features.
     
     Parameters:
-        data_sparse (scipy.sparse.csr_matrix): Input sparse matrix to be preprocessed.
-        normalization (str): Type of normalization to be applied. Default is 'l1'. {'l1', 'l2', 'max'}
-        
+        data_sparse (scipy.sparse.csr_matrix): Input sparse matrix to be preprocessed.        
     Returns:
         numpy.ndarray: Preprocessed dense matrix.
     """
-    data_dense = data_sp_csr_HVG.toarray()
-    data_normalized = normalize(data_dense, norm=normalization, axis=1)
 
-    # Log transform the data
-    data_log_transformed = np.log1p(data_normalized)  # Apply log(1+x) transformation to avoid log(0)
+    scran = importr('scran')
+    scater = importr('scater')
+    SingleCellExperiment = importr('SingleCellExperiment')
+    Matrix = importr('Matrix')
+
+    with localconverter(ro.default_converter + numpy2ri.converter):
+        r_matrix = Matrix.Matrix(data_sp_csr_HVG.toarray(), sparse=True)
+
+    sce = SingleCellExperiment.SingleCellExperiment(assays=ro.ListVector({'counts': r_matrix}))
+    clusters = scran.quickCluster(sce)
+    sce = scran.computeSumFactors(sce, clusters=clusters)
+    sce = scater.logNormCounts(sce)
+
+    norm_log_counts = ro.r['assay'](sce, 'logcounts')
+    data_log_transformed = np.array(norm_log_counts)
 
     # Scale the data (z-score normalization)
     scaler = StandardScaler()

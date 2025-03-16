@@ -29,23 +29,23 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 def load_data():
     """Load raw gene expression data, transpose and compress. Load metadata and gene description data."""
     start_time = time.time()
-    data_sparse = mmread(data_path).transpose().tocsr()
+    input_sparse_data = mmread(data_path).transpose().tocsr()
     logging.info(f'Runtime - loading raw count mtx: {time.time() - start_time}')
     
     metadata = pd.read_csv(metadata_path)
     gene_data = pd.read_csv(gene_data_path, sep='\t')
     
-    logging.info(f'Shape of the sparse data matrix: {data_sparse.shape}')
+    logging.info(f'Shape of the sparse data matrix: {input_sparse_data.shape}')
     logging.info(f'Metadata head: {metadata.head()}')
     logging.info(f'Unique Cell Types in metadata: {pd.unique(metadata["CellType"])}')
     logging.info(f'Shape of the gene data matrix: {gene_data.shape}')
     logging.info(f'Gene data head: {gene_data.head()}')
     logging.info(f'Are gene_data columns identical? {np.array_equal(gene_data.iloc[:, 0].values, gene_data.iloc[:, 1].values)}')
     
-    return data_sparse, metadata, gene_data
+    return input_sparse_data, metadata, gene_data
 
 def quality_control(data_sparse, metadata, gene_data):
-    """Perform cell quality control on the data."""
+    """Perform cell quality control on the raw input data."""
     num_UMIs = metadata['nUMI'].values
     num_genes = metadata['nGene'].values
     
@@ -92,14 +92,13 @@ def downsample_data(data_sparse_qc, metadata_qc):
 
 def feature_selection(downsampled_sparse_data):
     """Select highly variable genes (HVG)."""
-    data_sp_csr_HVG = slice_data_HVG(downsampled_sparse_data, perc_top_genes=0.1)
-    data_sp_csr_HVG.name = 'downsampled_sparse_data_HVG'
-    logging.info(f'Shape of raw data after feature selection: {data_sp_csr_HVG.shape}')
-    logging.info(f'Class of raw data after feature selection: {data_sp_csr_HVG.__class__}')
-    return data_sp_csr_HVG
+    output_HVG = slice_data_HVG(downsampled_sparse_data, perc_top_genes=0.1)
+    indices_HVG = output_HVG[1]
+    logging.info(f'Number of identified highly variable genes: {len(indices_HVG)}')
+    return indices_HVG
 
 def normLogTransformScale(data_sp_csr_HVG):
-    """Normalize, log-transform, and scale the data."""
+    """Pooling-based cell normalize, log-transformation, selection of the HVG, and z-score scaling."""
     normLogTransformScale_data = preprocess_sparse_matrix(data_sp_csr_HVG)
     normLogTransformScale_data.name = 'normScaleLogTransform_data'
     logging.info(f'Shape of data after normalization, log transformation, and scaling: {normLogTransformScale_data.shape}')
