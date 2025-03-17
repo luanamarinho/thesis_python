@@ -5,9 +5,10 @@ import pandas as pd
 from scipy.io import mmread
 from joblib import dump
 from utils.slice_data_HVG import slice_data_HVG
-from utils.data_pretreatment import preprocess_sparse_matrix
 from utils.sample_row_ind import sampled_ind_matrix
 import logging
+os.environ['R_HOME'] = 'C:/Program Files/R/R-4.3.3'
+from utils.data_pretreatment import preprocess_sparse_matrix
 
 # Global variables
 data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'matrix.mtx')
@@ -61,6 +62,7 @@ def quality_control(data_sparse, metadata, gene_data):
     qc_mask = (num_UMIs >= umi_cutoff) & (num_genes >= gene_cutoff) & (mito_fraction <= mito_cutoff)
     data_sparse_qc = data_sparse[qc_mask]
     metadata_qc = metadata[qc_mask]
+    metadata_qc.reset_index(drop=True, inplace=True)
     
     logging.info(f'Shape of the sparse data matrix after cell QC: {data_sparse_qc.shape}')
     logging.info(f'Removal of: {100 * (1 - data_sparse_qc.shape[0] / data_sparse.shape[0])}% of cells')
@@ -97,12 +99,13 @@ def feature_selection(downsampled_sparse_data):
     logging.info(f'Number of identified highly variable genes: {len(indices_HVG)}')
     return indices_HVG
 
-def normLogTransformScale(data_sp_csr_HVG, HVG_indices):
+def normLogTransformScale(data_sp_csr_HVG, HVG_indices, scale=True):
     """Pooling-based cell normalize, log-transformation, selection of the HVG, and z-score scaling."""
-    normLogTransformScale_data = preprocess_sparse_matrix(data_sp_csr_HVG, HVG_indices)
+    normLogTransformScale_data = preprocess_sparse_matrix(data_sp_csr_HVG, HVG_indices, scale=scale)
     normLogTransformScale_data.name = 'LogNormalizedScaledData'
     logging.info(f'Shape of data after log-normalization and scaling: {normLogTransformScale_data.shape}')
     logging.info(f'Class of data after log-normalization and scaling: {normLogTransformScale_data.__class__}')
+    return normLogTransformScale_data
 
 
 def save_data(data, metadata=None, save_data_path=None, save_metadata_path=None):
