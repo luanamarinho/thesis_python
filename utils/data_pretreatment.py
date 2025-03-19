@@ -7,7 +7,7 @@ from rpy2.robjects.conversion import localconverter
 from rpy2.robjects import numpy2ri
 import logging
 
-def preprocess_sparse_matrix(sparse_input, HVG_indices, scale=True):
+def preprocess_sparse_matrix(sparse_input, HVG_indices, pseudoCount = 0.01, scale=True):
     """
     Preprocesses a sparse matrix by cell normalizing, log-transforming, and scaling features.
     
@@ -18,6 +18,9 @@ def preprocess_sparse_matrix(sparse_input, HVG_indices, scale=True):
     Returns:
         numpy.ndarray: Log-normalized subset with identified HVG. If scale is True, the subset is z-score scaled.
     """
+
+    logging.info(f'Using pseudo-count of: {pseudoCount}')
+    logging.info(f'Z-scoring feature: {scale}')
 
     scran = importr('scran')
     scuttle = importr('scuttle')
@@ -31,7 +34,7 @@ def preprocess_sparse_matrix(sparse_input, HVG_indices, scale=True):
     clusters = scran.quickCluster(sce)
     logging.info(f'Number of computed clusters: {len(ro.r['levels'](clusters))}')
     sce = scran.computeSumFactors(sce, clusters=clusters)
-    sce = scuttle.logNormCounts(sce)
+    sce = scuttle.logNormCounts(sce, pseudo_count = pseudoCount, log = True)
 
     norm_log_counts = ro.r['assay'](sce, 'logcounts')
     norm_log_counts_dense = ro.r['as.matrix'](norm_log_counts)

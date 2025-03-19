@@ -96,19 +96,19 @@ def feature_selection(downsampled_sparse_data):
     """Select highly variable genes (HVG)."""
     output_HVG = slice_data_HVG(downsampled_sparse_data, perc_top_genes=0.1)
     indices_HVG = output_HVG[1]
-    logging.info(f'Number of identified highly variable genes: {len(indices_HVG)}')
+    logging.info(f'Number of identified highly variable genes: {sum(indices_HVG)}')
     return indices_HVG
 
 def normLogTransformScale(data_sp_csr_HVG, HVG_indices, scale=True):
     """Pooling-based cell normalize, log-transformation, selection of the HVG, and z-score scaling."""
     normLogTransformScale_data = preprocess_sparse_matrix(data_sp_csr_HVG, HVG_indices, scale=scale)
-    normLogTransformScale_data.name = 'LogNormalizedScaledData'
+    normLogTransformScale_data_name = 'LogNormalizedScaledData'
     logging.info(f'Shape of data after log-normalization and scaling: {normLogTransformScale_data.shape}')
     logging.info(f'Class of data after log-normalization and scaling: {normLogTransformScale_data.__class__}')
     return normLogTransformScale_data
 
 
-def save_data(data, metadata=None, save_data_path=None, save_metadata_path=None):
+def save_data(data, metadata=np.array([]), save_data_path=None, save_metadata_path=None):
     """Save data to file."""
     # Ensure the directory exists
     if save_data_path:
@@ -117,7 +117,7 @@ def save_data(data, metadata=None, save_data_path=None, save_metadata_path=None)
         logging.info('No save path provided for data. Data will be saved to the default directory.')
         save_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'preprocessed_data.pkl.gz')
     
-    if metadata and save_metadata_path:
+    if save_metadata_path:
         os.makedirs(os.path.dirname(save_metadata_path), exist_ok=True)
     
     try:
@@ -127,7 +127,7 @@ def save_data(data, metadata=None, save_data_path=None, save_metadata_path=None)
         logging.info(f'Data matrix {data_name} saved to {save_data_path}')
         
         # Save the metadata
-        if metadata and save_metadata_path:
+        if len(metadata)!= 0 and save_metadata_path is not None:
             metadata.to_csv(save_metadata_path, index=False)
             metadata_name = getattr(metadata, 'name', 'preprocessed_metadata')
             logging.info(f'Metadata {metadata_name} saved to {save_metadata_path}')
@@ -141,7 +141,7 @@ def main():
     downsampled_sparse_data, metadata_sampled = downsample_data(data_sparse_qc, metadata_qc)
     save_data(downsampled_sparse_data, metadata_sampled, save_sparse_data_path, save_metadata_path)
     indices_HVG_genes = feature_selection(downsampled_sparse_data)
-    logNormalized_HVG_subset = normLogTransformScale(downsampled_sparse_data, indices_HVG_genes, scale=True)
+    logNormalized_HVG_subset = normLogTransformScale(downsampled_sparse_data, indices_HVG_genes, scale=False)
     save_data(logNormalized_HVG_subset,
               save_data_path=os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'logNormalized_HVG_subset.pkl.gz'))
 
