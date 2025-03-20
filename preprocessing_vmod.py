@@ -33,15 +33,26 @@ def load_data():
     input_sparse_data = mmread(data_path).transpose().tocsr()
     logging.info(f'Runtime - loading raw count mtx: {time.time() - start_time}')
     
-    metadata = pd.read_csv(metadata_path)
-    gene_data = pd.read_csv(gene_data_path, sep='\t')
+    # Load only necessary columns from metadata
+    needed_columns = ['nUMI', 'nGene'] + grouping_columns
+    metadata = pd.read_csv(metadata_path, 
+                           usecols=needed_columns,
+                           chunksize=10000)
+    
+    # Read gene data in chunks if needed
+    gene_data = pd.read_csv(
+        gene_data_path, 
+        sep='\t',
+        usecols=[0],
+        chunksize=10000
+    )
+    gene_data = pd.concat(gene_data, ignore_index=True)
     
     logging.info(f'Shape of the sparse data matrix: {input_sparse_data.shape}')
+    logging.info(f'Shape of the metadata data matrix: {metadata.shape}')
     logging.info(f'Metadata head: {metadata.head()}')
-    logging.info(f'Unique Cell Types in metadata: {pd.unique(metadata["CellType"])}')
     logging.info(f'Shape of the gene data matrix: {gene_data.shape}')
     logging.info(f'Gene data head: {gene_data.head()}')
-    logging.info(f'Are gene_data columns identical? {np.array_equal(gene_data.iloc[:, 0].values, gene_data.iloc[:, 1].values)}')
     
     return input_sparse_data, metadata, gene_data
 
