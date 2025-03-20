@@ -48,4 +48,6 @@ histogram_plot_sd <- lapply(names(median_SD_pseudo), function(pseudo) {
     ylab("") +
     theme_minimal()
 })
-gridExtra::grid.arrange(grobs = histogram_plot_sd, ncol = 3)
+grid_sd <- gridExtra::grid.arrange(grobs = histogram_plot_sd, ncol = 3)
+
+ggsave("C:\\Users\\luana\\Documents\\thesis\\plots\\sd_histograms.png", grid_sd, width = 15, height = 5)
