@@ -30,9 +30,9 @@ file_sparse = f'downsampled_{max_nbr_samples}_sparse_gzip.pkl.gz'
 save_sparse_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', file_sparse)
 
 # Caching
-cache_dir = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'cache')
+cache_dir = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'cache')
 os.makedirs(cache_dir, exist_ok=True)
-memory = Memory(cache_dir, verbose=0)
+memory = Memory(cache_dir, mmap_mode=None, verbose=0)
 
 # Setting logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -86,7 +86,7 @@ def quality_control(data_sparse, metadata, gene_data):
         
         qc_mask = (num_UMIs >= umi_cutoff) & (num_genes >= gene_cutoff) & (mito_fraction <= mito_cutoff)
         data_sparse_qc = data_sparse[qc_mask]
-        metadata_qc = metadata.loc[qc_mask]
+        metadata_qc = metadata.loc[qc_mask].reset_index(drop=True)
         
         logging.info(f'Shape after QC: {data_sparse_qc.shape}')
         logging.info(f'Memory usage: {(psutil.Process().memory_info().rss - initial_memory) / 1024 / 1024:.2f} MB')
@@ -109,7 +109,7 @@ def downsample_data(data_sparse_qc, metadata_qc):
     logging.info(f'Length of sampled indices: {len(ind_rows_downsample)}')
     
     downsampled_sparse_data = data_sparse_qc[ind_rows_downsample]
-    metadata_sampled = metadata_qc.loc[ind_rows_downsample]
+    metadata_sampled = metadata_qc.iloc[ind_rows_downsample]
     metadata_sampled.name = 'downsampled_metadata'
     
     logging.info(f'Shape of Downsampled gene expression data: {downsampled_sparse_data.shape}')
