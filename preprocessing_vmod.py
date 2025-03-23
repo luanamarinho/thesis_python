@@ -2,22 +2,18 @@ import os
 import time
 import numpy as np
 import pandas as pd
-from scipy.io import mmread
 from joblib import dump
 from utils.slice_data_HVG import slice_data_HVG
 from utils.sample_row_ind import sampled_ind_matrix
 import logging
-import traceback
 os.environ['R_HOME'] = 'C:/Program Files/R/R-4.3.3'
 from utils.data_pretreatment import preprocess_sparse_matrix
-from memory_profiler import profile
 import gc
-from joblib import Memory
 import psutil 
 import scipy.sparse
 
 # Global variables
-data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'matrix.mtx')
+data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'matrix.npz')
 metadata_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', '2097-Lungcancer_metadata.csv.gz')
 gene_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'genes.tsv')
 grouping_columns = ['CellFromTumor', 'PatientNumber', 'TumorType', 'TumorSite', 'CellType']
@@ -29,11 +25,6 @@ seed = 42
 save_metadata_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'downsampled_metadata.csv')
 file_sparse = f'downsampled_{max_nbr_samples}_sparse_gzip.pkl.gz'
 save_sparse_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', file_sparse)
-
-# Caching
-cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'inst', 'data', 'cache')
-os.makedirs(cache_dir, exist_ok=True)
-memory = Memory(cache_dir, mmap_mode=None, verbose=0)
 
 # Setting logging
 logging.basicConfig(
@@ -161,11 +152,8 @@ def save_data(data, metadata=np.array([]), save_data_path=None, save_metadata_pa
     finally:
         gc.collect()
 
-@profile
 def main():
-    """Main function with memory tracking."""
-    initial_memory = psutil.Process().memory_info().rss
-    
+    """Main function."""
     try:
         logging.info("Starting preprocessing pipeline")
         
@@ -175,7 +163,7 @@ def main():
         # Load sparse matrix directly in main
         logging.info(f"Loading sparse matrix from {data_path}")
         matrix_start = time.time()
-        data_sparse = mmread(data_path).transpose().tocsr()
+        data_sparse = scipy.sparse.load_npz(data_path)
         logging.info(f'Runtime - loading sparse matrix: {time.time() - matrix_start:.2f} seconds')
         
         # Load other data
@@ -222,11 +210,8 @@ def main():
         
     except Exception as e:
         logging.error(f"Error in main: {str(e)}")
-        logging.error(traceback.format_exc())
         raise
     finally:
-        final_memory = psutil.Process().memory_info().rss
-        logging.info(f'Total memory change: {(final_memory - initial_memory) / 1024 / 1024:.2f} MB')
         gc.collect()
 
 if __name__ == "__main__":
@@ -234,4 +219,4 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         logging.error(f"Script failed with error: {str(e)}")
-        logging.error(traceback.format_exc())
+        raise
