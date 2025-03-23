@@ -7,6 +7,7 @@ from joblib import dump
 from utils.slice_data_HVG import slice_data_HVG
 from utils.sample_row_ind import sampled_ind_matrix
 import logging
+import traceback
 os.environ['R_HOME'] = 'C:/Program Files/R/R-4.3.3'
 from utils.data_pretreatment import preprocess_sparse_matrix
 from memory_profiler import profile
@@ -30,42 +31,45 @@ file_sparse = f'downsampled_{max_nbr_samples}_sparse_gzip.pkl.gz'
 save_sparse_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', file_sparse)
 
 # Caching
-cache_dir = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'cache')
+cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'inst', 'data', 'cache')
 os.makedirs(cache_dir, exist_ok=True)
 memory = Memory(cache_dir, mmap_mode=None, verbose=0)
 
 # Setting logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('preprocessing.log'),
+        logging.StreamHandler()
+    ]
+)
 
-@profile
-@memory.cache
-def load_data():
-    """Load raw gene expression data with memory tracking."""
+def load_metadata():
+    """Load metadata."""
+    logging.info(f"Loading metadata from {metadata_path}")
     start_time = time.time()
-    initial_memory = psutil.Process().memory_info().rss
-    
     try:
-        input_sparse_data = mmread(data_path).transpose().tocsr()
-        logging.info(f'Runtime - loading raw count mtx: {time.time() - start_time}')
-        
         needed_columns = ['nUMI', 'nGene'] + grouping_columns
         metadata = pd.read_csv(metadata_path, usecols=needed_columns)
-        
-        gene_data = pd.read_csv(
-            gene_data_path, 
-            sep='\t',
-            usecols=[0]
-        )
-        
-        logging.info(f'Shape of the sparse data matrix: {input_sparse_data.shape}')
-        logging.info(f'Memory usage: {(psutil.Process().memory_info().rss - initial_memory) / 1024 / 1024:.2f} MB')
-        
-        return input_sparse_data, metadata, gene_data
-    finally:
-        gc.collect()
+        logging.info(f'Runtime - loading metadata: {time.time() - start_time:.2f} seconds')
+        return metadata
+    except Exception as e:
+        logging.error(f"Error loading metadata: {str(e)}")
+        raise
 
-@profile
-@memory.cache
+def load_gene_data():
+    """Load gene data."""
+    logging.info(f"Loading gene data from {gene_data_path}")
+    start_time = time.time()
+    try:
+        gene_data = pd.read_csv(gene_data_path, sep='\t', usecols=[0])
+        logging.info(f'Runtime - loading gene data: {time.time() - start_time:.2f} seconds')
+        return gene_data
+    except Exception as e:
+        logging.error(f"Error loading gene data: {str(e)}")
+        raise
+
 def quality_control(data_sparse, metadata, gene_data):
     """Perform cell quality control with memory tracking."""
     initial_memory = psutil.Process().memory_info().rss
@@ -132,7 +136,6 @@ def normLogTransformScale(data_sp_csr_HVG, HVG_indices, scale=True):
     logging.info(f'Class of data after log-normalization and scaling: {normLogTransformScale_data.__class__}')
     return normLogTransformScale_data
 
-@profile
 def save_data(data, metadata=np.array([]), save_data_path=None, save_metadata_path=None):
     """Save data in efficient format with memory tracking."""
     try:
@@ -164,41 +167,71 @@ def main():
     initial_memory = psutil.Process().memory_info().rss
     
     try:
-        # Load and QC
-        data_sparse, metadata, gene_data = load_data()
+        logging.info("Starting preprocessing pipeline")
+        
+        # Load data
+        logging.info("Step 1: Loading data")
+        
+        # Load sparse matrix directly in main
+        logging.info(f"Loading sparse matrix from {data_path}")
+        matrix_start = time.time()
+        data_sparse = mmread(data_path).transpose().tocsr()
+        logging.info(f'Runtime - loading sparse matrix: {time.time() - matrix_start:.2f} seconds')
+        
+        # Load other data
+        metadata = load_metadata()
+        gene_data = load_gene_data()
+        
         gc.collect()
         
+        logging.info("Step 2: Performing quality control")
         data_sparse_qc, metadata_qc = quality_control(data_sparse, metadata, gene_data)
         del data_sparse, metadata, gene_data
         gc.collect()
         
         # Downsample
+        logging.info("Step 3: Downsampling data")
         downsampled_sparse_data, metadata_sampled = downsample_data(data_sparse_qc, metadata_qc)
         del data_sparse_qc, metadata_qc
         gc.collect()
         
         # Save downsampled data
+        logging.info("Step 4: Saving downsampled data")
         save_data(downsampled_sparse_data, metadata_sampled, 
                  save_sparse_data_path, save_metadata_path)
         
         # Feature selection and normalization
+        logging.info("Step 5: Performing feature selection")
         indices_HVG_genes = feature_selection(downsampled_sparse_data)
+        
+        logging.info("Step 6: Normalizing and scaling data")
         logNormalized_HVG_subset = normLogTransformScale(
             downsampled_sparse_data, indices_HVG_genes, scale=False)
         del downsampled_sparse_data
         gc.collect()
         
         # Save final results
+        logging.info("Step 7: Saving final results")
         fname = f'logNormalized_HVG_subset_{max_nbr_samples}_samples.pkl'
         final_save_path = os.path.join(os.path.dirname(os.getcwd()), 
                                      'thesis', 'data', 
                                      fname)
         save_data(logNormalized_HVG_subset, save_data_path=final_save_path)
         
+        logging.info("Preprocessing pipeline completed successfully")
+        
+    except Exception as e:
+        logging.error(f"Error in main: {str(e)}")
+        logging.error(traceback.format_exc())
+        raise
     finally:
         final_memory = psutil.Process().memory_info().rss
         logging.info(f'Total memory change: {(final_memory - initial_memory) / 1024 / 1024:.2f} MB')
         gc.collect()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logging.error(f"Script failed with error: {str(e)}")
+        logging.error(traceback.format_exc())
