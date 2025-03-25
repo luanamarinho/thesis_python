@@ -22,6 +22,7 @@ gene_cutoff = 500
 mito_cutoff = 0.2
 max_nbr_samples = 5000
 seed = 42
+scale = True
 save_metadata_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'downsampled_metadata.csv')
 file_sparse = f'downsampled_{max_nbr_samples}_sparse_gzip.pkl.gz'
 save_sparse_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', file_sparse)
@@ -194,13 +195,13 @@ def main():
         
         logging.info("Step 6: Normalizing and scaling data")
         logNormalized_HVG_subset = normLogTransformScale(
-            downsampled_sparse_data, indices_HVG_genes, scale=False)
+            downsampled_sparse_data, indices_HVG_genes, scale=scale)
         del downsampled_sparse_data
         gc.collect()
         
         # Save final results
         logging.info("Step 7: Saving final results")
-        fname = f'logNormalized_HVG_subset_{max_nbr_samples}_samples.pkl'
+        fname = f'logNormalized_HVG_subset_{max_nbr_samples}_samples_scaled_{scale}.pkl'
         final_save_path = os.path.join(os.path.dirname(os.getcwd()), 
                                      'thesis', 'data', 
                                      fname)
