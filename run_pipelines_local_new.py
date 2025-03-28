@@ -18,7 +18,7 @@ logging.basicConfig(
 
 def tsne_pipelines(lower_bound: int, upper_bound: int, sampled: bool = False):
     """
-    Produces t-SNE BH embeddings for multiple pipelines, derived from the tuples of parameter combinations
+    Produces t-SNE BH embeddings for multiple pipelines, each being represented by a tuple of parameters configuration
     (theta, initial momentum, final momentum, early exaggeration), for a fixed perplexity value.
 
     Parameters:
