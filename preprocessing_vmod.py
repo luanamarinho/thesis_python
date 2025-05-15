@@ -6,16 +6,22 @@ from joblib import dump
 from utils.slice_data_HVG import slice_data_HVG
 from utils.sample_row_ind import sampled_ind_matrix
 import logging
-os.environ['R_HOME'] = 'C:/Program Files/R/R-4.3.3'
+os.environ['R_HOME'] = '/usr/lib/R'
 from utils.data_pretreatment import preprocess_sparse_matrix
 import gc
-import psutil 
+import psutil
+import tarfile
+import tempfile
+import os
+from scipy.io import mmread
 import scipy.sparse
+from scanpy import read_mtx
 
 # Global variables
-data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'matrix.npz')
-metadata_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', '2097-Lungcancer_metadata.csv.gz')
-gene_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'genes.tsv')
+data_path = os.path.join(os.path.dirname(os.getcwd()), 'data', 'matrix.mtx')
+metadata_path = os.path.join(os.path.dirname(os.getcwd()), 'data', '2097-Lungcancer_metadata.csv')
+gene_data_path = os.path.join(os.path.dirname(os.getcwd()), 'data', 'genes.tsv')
+# tar_gz_path = os.path.join(os.path.dirname(os.getcwd()), 'data', '2096-Lungcancer_counts.tar.gz')
 grouping_columns = ['CellFromTumor', 'PatientNumber', 'TumorType', 'TumorSite', 'CellType']
 umi_cutoff = 1000
 gene_cutoff = 500
@@ -23,9 +29,9 @@ mito_cutoff = 0.2
 max_nbr_samples = 5000
 seed = 42
 scale = True
-save_metadata_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', 'downsampled_metadata.csv')
+save_metadata_path = os.path.join(os.path.dirname(os.getcwd()), 'data', 'downsampled_metadata.csv')
 file_sparse = f'downsampled_{max_nbr_samples}_sparse_gzip.pkl.gz'
-save_sparse_data_path = os.path.join(os.path.dirname(os.getcwd()), 'thesis', 'data', file_sparse)
+save_sparse_data_path = os.path.join(os.path.dirname(os.getcwd()), 'data', file_sparse)
 
 # Setting logging
 logging.basicConfig(
@@ -37,7 +43,32 @@ logging.basicConfig(
     ]
 )
 
-def load_metadata():
+def extract_compressed_file_name(tar_gz_path):
+    """Extracts compressed files from the file path."""
+
+    temp_files = {
+        'matrix': None,
+        'genes': None,
+        'barcodes': None
+    }
+
+    with tarfile.open(tar_gz_path, "r:gz") as tar:
+        for member in tar.getmembers():
+            if member.name.endswith("matrix.mtx"):
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mtx") as tmp:
+                    tmp.write(tar.extractfile(member).read())
+                    temp_files['matrix'] = tmp.name
+            elif member.name.endswith("genes.tsv"):
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".tsv") as tmp:
+                    tmp.write(tar.extractfile(member).read())
+                    temp_files['genes'] = tmp.name
+            elif member.name.endswith("barcodes.tsv"):
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".tsv") as tmp:
+                    tmp.write(tar.extractfile(member).read())
+                    temp_files['barcodes'] = tmp.name
+
+
+def load_metadata(metadata_path):
     """Load metadata."""
     logging.info(f"Loading metadata from {metadata_path}")
     start_time = time.time()
@@ -50,9 +81,10 @@ def load_metadata():
         logging.error(f"Error loading metadata: {str(e)}")
         raise
 
-def load_gene_data():
+def load_gene_data(gene_data_path):
     """Load gene data."""
     logging.info(f"Loading gene data from {gene_data_path}")
+
     start_time = time.time()
     try:
         gene_data = pd.read_csv(gene_data_path, sep='\t', usecols=[0])
@@ -70,9 +102,11 @@ def quality_control(data_sparse, metadata, gene_data):
         num_UMIs = metadata['nUMI'].values
         num_genes = metadata['nGene'].values
         
-        mito_genes = [gene for gene in gene_data.iloc[:, 0] if gene.startswith('MT-')]
+        # mito_genes = [gene for gene in gene_data.iloc[:, 0] if gene.startswith('MT-')]
+        mito_genes = gene_data[gene_data.iloc[:, 0].str.startswith('MT-')].iloc[:, 0].tolist()
         if len(mito_genes) > 0:
-            mito_gene_indices = [i for i, gene in enumerate(gene_data.iloc[:, 0]) if gene in mito_genes]
+            # mito_gene_indices = [i for i, gene in enumerate(gene_data.iloc[:, 0]) if gene in mito_genes]
+            mito_gene_indices = gene_data[gene_data.iloc[:, 0].isin(mito_genes)].index.tolist()
             mito_counts = np.array(data_sparse[:, mito_gene_indices].sum(axis=1)).flatten()
             mito_fraction = mito_counts / num_UMIs
             del mito_counts
@@ -84,7 +118,7 @@ def quality_control(data_sparse, metadata, gene_data):
         data_sparse_qc = data_sparse[qc_mask]
         metadata_qc = metadata.loc[qc_mask].reset_index(drop=True)
         
-        logging.info(f'Shape after QC: {data_sparse_qc.shape}')
+        # logging.info(f'Shape after QC: {data_sparse_qc.shape}')
         logging.info(f'Memory usage: {(psutil.Process().memory_info().rss - initial_memory) / 1024 / 1024:.2f} MB')
         
         return data_sparse_qc, metadata_qc
@@ -92,7 +126,7 @@ def quality_control(data_sparse, metadata, gene_data):
         del qc_mask, mito_fraction
         gc.collect()
 
-def downsample_data(data_sparse_qc, metadata_qc):
+def downsample_data(data_sparse_qc, metadata_qc, max_nbr_samples=max_nbr_samples):
     """Downsample the data."""
     ind_rows_downsample = sampled_ind_matrix(
         metadata=metadata_qc,
@@ -157,24 +191,33 @@ def main():
     """Main function."""
     try:
         logging.info("Starting preprocessing pipeline")
-        
+
+        # tmp_files = extract_compressed_file_name(tar_gz_path=tar_gz_path)
+        # data_path = tmp_files['matrix']
+        # gene_data_path = tmp_files['genes']
         # Load data
         logging.info("Step 1: Loading data")
         
         # Load sparse matrix directly in main
         logging.info(f"Loading sparse matrix from {data_path}")
         matrix_start = time.time()
-        data_sparse = scipy.sparse.load_npz(data_path)
+        data_sparse = mmread(data_path).T.tocsr()
         logging.info(f'Runtime - loading sparse matrix: {time.time() - matrix_start:.2f} seconds')
-        
+        logging.info(f'Shape of sparse matrix: {data_sparse.shape}')
+        logging.info(f'Class of sparse matrix: {data_sparse.__class__}')
+
         # Load other data
-        metadata = load_metadata()
-        gene_data = load_gene_data()
+        metadata = load_metadata(metadata_path)
+        logging.info(f'Shape of metadata: {metadata.shape}')
+        gene_data = load_gene_data(gene_data_path)
+        logging.info(f'Shape of gene data: {gene_data.shape}')
         
         gc.collect()
         
         logging.info("Step 2: Performing quality control")
         data_sparse_qc, metadata_qc = quality_control(data_sparse, metadata, gene_data)
+        logging.info(f'Shape or count data after QC: {data_sparse_qc.shape}')
+        logging.info(f'Shape of metadata after QC: {metadata_qc.shape}')
         del data_sparse, metadata, gene_data
         gc.collect()
         
@@ -203,7 +246,7 @@ def main():
         logging.info("Step 7: Saving final results")
         fname = f'logNormalized_HVG_subset_{max_nbr_samples}_samples_scaled_{scale}.pkl'
         final_save_path = os.path.join(os.path.dirname(os.getcwd()), 
-                                     'thesis', 'data', 
+                                     'data', 
                                      fname)
         save_data(logNormalized_HVG_subset, save_data_path=final_save_path)
         

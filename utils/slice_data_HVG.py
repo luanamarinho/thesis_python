@@ -14,7 +14,7 @@ def slice_data_HVG(expr_data, perc_top_genes = 0.1):
     """
     adata = AnnData(X = expr_data)
     sc.pp.highly_variable_genes(adata, n_top_genes=int(perc_top_genes * adata.shape[1]), flavor='seurat_v3')
-    highly_variable_genes = adata.var['highly_variable']
+    highly_variable_genes = adata.var['highly_variable'].values
     sliced_X = adata.X[:, highly_variable_genes]
 
     return sliced_X, highly_variable_genes
