@@ -7,7 +7,6 @@ def shepard_stress_chunk(dist_X, dist_embedded):
   Parameters:
   original_distances (numpy.ndarray): A chunk of pairwise distances in the original high-dimensional space.
   reduced_distances (numpy.ndarray): A chunk of pairwise distances in the reduced low-dimensional space.
-  metric (bool): Whether to use the metric version of MDS.
     
   Returns:
   tuple: Shepard stress numerator and denominator for the chunk.

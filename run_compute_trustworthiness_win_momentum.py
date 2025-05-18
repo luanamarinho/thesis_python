@@ -8,15 +8,15 @@ from joblib import Parallel, delayed, load
 import os
 import argparse
 
-def run_compute_metrics(folder = "C:/Users/luana/Documents/data", start_index = 0, end_index = None, k = [30,300], toy_data = False):
+def run_compute_metrics(folder = None, start_index = 0, end_index = None, k = [30,300], toy_data = False):
   # Load the input distance matrix and the tsne maps
   if not toy_data:
-    dist_X = load(os.path.join(folder,"dist_X_5000.joblib"), mmap_mode='r')
-    data_tsne = load(os.path.join(folder,"df_tsne_momentum.joblib"), mmap_mode='r')
+    dist_X = load(os.path.join(folder,"distance_matrix_preprocessed_5000.pkl"), mmap_mode='r')
+    data_tsne = load(os.path.join("output","df_tsne_final.joblib.gz"))
     data_tsne = data_tsne.values
   elif toy_data:
-    dist_X = load(os.path.join('output',"dist_X_toy.joblib"), mmap_mode='r')
-    data_tsne = load(os.path.join('output',"data_mds_toy.joblib"), mmap_mode='r')
+    dist_X = load(os.path.join(folder,"dist_X_toy.pkl"), mmap_mode='r')
+    data_tsne = load(os.path.join(folder,"data_mds_toy.pkl"), mmap_mode='r')
   
   if end_index is None:
     end_index = data_tsne.shape[1]
@@ -75,7 +75,7 @@ def process_tsne_map(index, output_trust, output_stress, data_tsne, dist_X, k, s
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run compute metrics")
-    parser.add_argument("--folder", type=str, default="C:/Users/luana/Documents/data", help="Folder containing input data")
+    parser.add_argument("--folder", type=str, default="../data", help="Folder containing input data")
     parser.add_argument("--start_index", type=int, default=0, help="Start index")
     parser.add_argument("--end_index", type=int, help="End index")
     parser.add_argument("--k", type=int, nargs='+', default=[30, 300], help="List of k values for trustworthiness")
