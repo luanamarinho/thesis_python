@@ -37,21 +37,22 @@ def tsne_pipelines(lower_bound: int, upper_bound: int, sampled: bool = False):
     
     try:
         # Load data
-        data_file_path = 'C:/Users/luana/Documents/data/data_preprocessed_5000_10HVG'#'/home/luana/workspace/data/data_preprocessed_40000_10HVG'
-        with gzip.GzipFile(data_file_path, "r") as data_file:
-            expr_data_preprocessed = np.load(data_file)
+        data_file_path = 'logNormalized_HVG_subset_5000_samples_scaled_True.pkl'#'/home/luana/workspace/data/data_preprocessed_40000_10HVG'
+        data_file_path = os.path.join(os.path.dirname(os.getcwd()), "data", data_file_path)
+        expr_data_preprocessed = load(data_file_path)
         
         if sampled:
-            ind_to_sample = np.load('inst/ind_to_sample_200.npy')[:100]
+            ind_to_sample = np.random.RandomState(42).randint(low=0, high=expr_data_preprocessed.shape[0], size=100)
             expr_data_preprocessed = expr_data_preprocessed[ind_to_sample]
 
         # Generate combinations
-        #combinations = load('output/parameter_combinations.joblib') #used for the 495 combinations
-        #combinations_BH = [comb for comb in combinations if comb[-1] >= 0.1]
-        #combinations_BH_run = combinations_BH[lower_bound:upper_bound]
-        combinations = load('output/tsne_parameter_combinations_IM_test.joblib') #used for testing IM
+        combinations = load('output/parameter_combinations.joblib') #used for the 495 combinations
+        # combinations_debug = combinations[:10]
         combinations_BH = [comb for comb in combinations if comb[-1] >= 0.1]
         combinations_BH_run = combinations_BH[lower_bound:upper_bound]
+        # combinations = load('output/tsne_parameter_combinations_IM_test.joblib') #used for testing IM
+        # combinations_BH = [comb for comb in combinations if comb[-1] >= 0.1]
+        # combinations_BH_run = combinations_BH[lower_bound:upper_bound]
 
         # Compute affinities
         #start_time = time.time()
@@ -63,7 +64,7 @@ def tsne_pipelines(lower_bound: int, upper_bound: int, sampled: bool = False):
 
         # Save results
         output = (pipelines)
-        result_file_path = os.path.join("output", f"pipeline_multiples_{lower_bound}-{upper_bound}_debug_new_test_IM.joblib")
+        result_file_path = os.path.join("output", f"pipeline_multiples_{lower_bound}-{upper_bound}_sampled--{str(sampled)}_new.joblib")
         dump(output, result_file_path)
 
         logging.info("Script executed successfully with lower_bound %d, upper_bound %d", lower_bound, upper_bound)
@@ -72,11 +73,12 @@ def tsne_pipelines(lower_bound: int, upper_bound: int, sampled: bool = False):
         logging.error("An error occurred: %s", str(e), exc_info=True)  # exc_info=True logs the traceback
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run t-SNE pipelines with specified parameters.")
-    parser.add_argument("--lower_bound", type=int, required=True, help="Lower bound index for the set of tuples.")
-    parser.add_argument("--upper_bound", type=int, required=True, help="Upper bound index for the set of tuples.")
-    parser.add_argument("--sampled", action='store_true', help="If set, the input data will be randomly downsampled to 100 observations.")
+    # parser = argparse.ArgumentParser(description="Run t-SNE pipelines with specified parameters.")
+    # parser.add_argument("--lower_bound", type=int, required=True, help="Lower bound index for the set of tuples.")
+    # parser.add_argument("--upper_bound", type=int, required=True, help="Upper bound index for the set of tuples.")
+    # parser.add_argument("--sampled", action='store_true', help="If set, the input data will be randomly downsampled to 100 observations.")
     
-    args = parser.parse_args()
+    # args = parser.parse_args()
     
-    tsne_pipelines(lower_bound=args.lower_bound, upper_bound=args.upper_bound, sampled=args.sampled)
+    # tsne_pipelines(lower_bound=args.lower_bound, upper_bound=args.upper_bound, sampled=args.sampled)
+    tsne_pipelines(lower_bound=300, upper_bound=460, sampled=False)
