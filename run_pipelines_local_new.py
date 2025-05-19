@@ -81,4 +81,4 @@ if __name__ == "__main__":
     # args = parser.parse_args()
     
     # tsne_pipelines(lower_bound=args.lower_bound, upper_bound=args.upper_bound, sampled=args.sampled)
-    tsne_pipelines(lower_bound=300, upper_bound=460, sampled=False)
+    tsne_pipelines(lower_bound=460, upper_bound=560, sampled=False)
