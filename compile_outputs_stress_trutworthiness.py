@@ -3,11 +3,6 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.inspection import PartialDependenceDisplay, permutation_importance
-from sklearn.tree import DecisionTreeClassifier, plot_tree, export_text
-from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.ensemble import RandomForestRegressor
 import os
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from scipy import stats  # Fixed: Import stats for t-distribution
@@ -15,8 +10,6 @@ from statsmodels.stats.multitest import multipletests
 from matplotlib import rcParams
 import shap
 from joblib import load, dump
-from sklearn.model_selection import GroupShuffleSplit
-from sklearn.preprocessing import OneHotEncoder
 
 
 # Load the data
@@ -42,7 +35,7 @@ df_metrics_original = load(path_metrics)
 df_metrics_original['T(30)'] = np.copy(output_trust[:,0])
 df_metrics_original['T(300)'] = np.copy(output_trust[:,1])
 df_metrics_original['Stress'] = np.copy(output_stress)
-# dump(df_metrics, 'output/df_metric_final_wresults.joblib')
+# dump(df_metrics, 'output/df_metric_final_wresults.joblib') # File saved
 
 df_metrics = df_metrics_original.copy()
 
@@ -68,10 +61,6 @@ for out in outcomes:
     print('Range of', out, ':', (df_metrics[out].min(), df_metrics[out].max()))
 
 
-# Correlation
-cormat = df_metrics.drop(columns=['Combination'], inplace=False).corr()
-cor_sliced = cormat.iloc[:5, 6:]
-cor_sliced
 
 # Correlation matrix with p-values
 def corr_with_pvalues(df):
@@ -100,20 +89,11 @@ def corr_with_pvalues(df):
 
     # --- Step 3: Filter significant correlations ---
     significant = p_adjusted_matrix < 0.05
-    return cor_df, significant
+    return cor_df, significant, p_adjusted_matrix
     
-cols_remove = ['Combination']
-if 'Source' in df_metrics.columns:
-    cols_remove = cols_remove + ['Source']
-
-cor_df, significant = corr_with_pvalues(df_metrics.drop(columns=cols_remove, inplace=False))
-sig_correlations = cor_df[significant].stack().dropna()
-print("Significant correlations (Bonferroni-adjusted):")
-print(sig_correlations)
-
 
 # Scatter plot
-def plot_scatter_with_regression(data, parameters, outcomes, regression_type=None, alpha=0.5, degree=1, figsize=(12, 8), font_size=12, font_size_ticks=12, label_offset=-0.4, save_path=None, legend=False, color_by=None):
+def plot_scatter_with_regression(data, parameters, outcomes, regression_type=None, alpha=0.5, degree=1, figsize=(12, 8), font_size=12, font_size_ticks=12, label_offset=-0.4, save_path=None, legend=False, color_by=None, fm_thresholds=None, theta_threshold=None):
     """
     Create scatter plots with optional regression lines and subplot labels.
 
@@ -131,6 +111,8 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
     - save_path: File path to save the plot. If None, the plot will not be saved. Default is None.
     - legend: Boolean flag to control the display of the legend. Default is False.
     - color_by: Column name to use for color coding points. Can be categorical or continuous. Default is None.
+    - fm_thresholds: Value or list of values of Final momentum to draw vertical lines at. Default is None.
+    - theta_threshold: Value of Theta to draw vertical line at. Default is None.
     """
 
     # Calculate the number of rows and columns
@@ -148,8 +130,9 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
     if color_by is not None and color_by in data.columns:
         is_categorical = data[color_by].dtype == 'object' or data[color_by].dtype.name == 'category'
 
-    # Create a list to store scatter objects for continuous color coding
-    scatter_objects = []
+    # Convert single threshold to list for consistent handling
+    if fm_thresholds is not None and not isinstance(fm_thresholds, list):
+        fm_thresholds = [fm_thresholds]
 
     # Loop through each subplot
     for i, outcome in enumerate(outcomes):
@@ -162,17 +145,22 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
                 if is_categorical:
                     # Use seaborn's scatterplot for categorical variables
                     sns.scatterplot(data=data, x=parameter, y=outcome, 
-                                  hue=color_by, palette='Set2', alpha=alpha, ax=ax)
-                    if legend and j == len(parameters) - 1 and i == 0:
-                        ax.legend(title=color_by, bbox_to_anchor=(1.05, 1), loc='upper left')
+                                  hue=color_by, palette='Set2', alpha=alpha, ax=ax, legend=False)
                 else:
                     # Use matplotlib's scatter for continuous variables
                     scatter = ax.scatter(data[parameter], data[outcome], 
                                        c=data[color_by], cmap='viridis', alpha=alpha)
-                    if i == 0 and j == 0:  # Store scatter object only from first plot
-                        scatter_objects.append(scatter)
             else:
                 ax.scatter(data[parameter], data[outcome], alpha=alpha)
+            
+            # Add vertical lines if Final momentum is on x-axis and thresholds are provided
+            if parameter == 'Final momentum' and fm_thresholds is not None:
+                for threshold in fm_thresholds:
+                    ax.axvline(x=threshold, color='red', linestyle='--', alpha=0.5)
+            
+            # Add vertical line if Theta is on x-axis and threshold is provided
+            if parameter == 'Theta' and theta_threshold is not None:
+                ax.axvline(x=theta_threshold, color='gray', linestyle='--', alpha=0.5)
             
             # Fit regression line if specified
             if regression_type == 'polyfit':
@@ -208,12 +196,6 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
                 ax.text(0.5, label_offset, subplot_label, transform=ax.transAxes,
                         fontsize=font_size, ha='center', va='top')
 
-    # Add a single colorbar for continuous color coding
-    if not is_categorical and color_by is not None and scatter_objects:
-        # Create a new axes for the colorbar
-        cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])  # [left, bottom, width, height]
-        fig.colorbar(scatter_objects[0], cax=cbar_ax, label=color_by)
-
     # Adjust the layout to ensure everything fits nicely
     plt.tight_layout()
 
@@ -224,13 +206,6 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
 
     # Show the plot
     plt.show()
-
-sub_outcomes = ['KL', 'T(30)', 'T(300)']
-plot_scatter_with_regression(
-    df_metrics, parameters, sub_outcomes,
-    label_offset=-0.5, save_path = None, font_size=11,
-    font_size_ticks = 11, figsize=(10,5))
-
 
 # Scater plot color-coding by 'Final momentum'
 def pairscatter_colorcoded(data, x, y, color_col, title=None, figsize=(10, 6), save_path=None):
@@ -254,14 +229,6 @@ def pairscatter_colorcoded(data, x, y, color_col, title=None, figsize=(10, 6), s
     # Show the plot
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.show()
-
-out = 'Stress'
-param = 'Final momentum'
-color_col = 'Perplexity'
-pairscatter_colorcoded(df_metrics, param, out, color_col) 
-pairscatter_colorcoded(df_metrics[df_metrics['Final momentum'] < 0.96], param, out, color_col)
-pairscatter_colorcoded(df_metrics[df_metrics['Final momentum'] <
-                                     0.96], color_col, out, param)
 
 
 def boxplots(df, outcomes, figsize=(12, 8)):
@@ -291,9 +258,6 @@ def boxplots(df, outcomes, figsize=(12, 8)):
     # Show the plot
     plt.show()
 
-boxplots(df_metrics, outcomes, figsize=(12, 8))
-boxplots(df_metrics[df_metrics[df_metrics['Final momentum'] <= 0.96]], outcomes, figsize=(12, 8))
-
 
 def identify_outliers(df, column):
     """
@@ -321,13 +285,203 @@ def identify_outliers(df, column):
 
     return lower_bound, upper_bound
 
+
+df_metrics = load('output/df_metric_final_wresults_stressTrust.joblib')
+df_metrics['Source'] = 'New'
+df_metrics.shape
+df_metrics.describe()
+sns.kdeplot(data=df_metrics, x='Runtime (sec)', fill=True)
+plt.show()
+
+df_metrics_old = pd.read_csv("output/df_metric_momentum_wresults.csv")
+df_metrics_old.rename(
+    columns={'Early_exaggeration': 'Early exaggeration',
+             'Initial_momentum': 'Initial momentum',
+             'Final_momentum': 'Final momentum',
+             'tSNE_runtime_min': 'Runtime (min)',
+             'KL_divergence': 'KL',
+             'trust_k30': 'T(30)',
+             'trust_k300': 'T(300)',
+             'stress': 'Stress'
+}, inplace=True)
+df_metrics_old['Runtime (sec)'] = df_metrics_old['Runtime (min)'] * 60
+df_metrics_old['Source'] = 'Old'
+df_metrics_old.shape
+sns.kdeplot(data=df_metrics_old, x='Runtime (sec)', fill=True)
+plt.show()
+
+df_metrics_old.describe()
+
+(df_metrics_old['Runtime (sec)'] >= 5000).sum()
+(df_metrics_old['Runtime (sec)'] >= 1500).sum()
+(df_metrics_old['Runtime (sec)'] >= 1300).sum()
+
+sns.kdeplot(data=df_metrics_old[df_metrics_old['Runtime (sec)'] <= 1500], x='Runtime (sec)', fill=True)
+plt.show()
+
+
+df_merged_original = pd.concat([df_metrics, df_metrics_old], axis=0)
+df_merged_original.shape
+
+parameters = ['Perplexity', 'Early exaggeration', 'Initial momentum', 'Final momentum', 'Theta']
+outcomes = ['KL', 'T(30)', 'T(300)', 'Stress', 'Runtime (sec)']
+sub_outcomes = ['KL', 'T(30)', 'T(300)']
+plot_scatter_with_regression(df_merged_original, parameters, sub_outcomes, color_by='Source', legend=False, fm_thresholds=0.95, figsize=(15, 8))
+plot_scatter_with_regression(
+    df_merged_original, parameters,
+    ['Stress', 'Runtime (sec)'], color_by='Source',
+    legend=False, fm_thresholds=[0.95, 0.96],
+    figsize=(15, 8))
+plot_scatter_with_regression(
+    df_merged_original, parameters, outcomes,
+    color_by='Source', legend=False,
+    fm_thresholds=[0.95],
+    figsize=(12, 8),
+    label_offset=-0.4)
+
+
+df_merged_original[df_merged_original['Stress'] > 1]['Final momentum'].describe()
+df_merged_original[df_merged_original['Final momentum'] > 0.96]['Stress'].describe()
+
+_, upper_limit_time = identify_outliers(df_merged_original, 'Runtime (sec)')
+_, upper_limit_time_new = identify_outliers(df_merged_original[df_merged_original['Source'] == 'New'], 'Runtime (sec)')
+_, upper_limit_time_old= identify_outliers(df_merged_original[df_merged_original['Source'] == 'Old'], 'Runtime (sec)')  
+
+
+pairscatter_colorcoded(
+    df_merged_original[df_merged_original['Source'] == 'New'],
+    'Theta', 'Runtime (sec)', 'Perplexity'
+)
+
+pairscatter_colorcoded(
+    df_merged_original[df_merged_original['Source'] == 'Old'],
+    'Theta', 'Runtime (sec)', 'Final momentum'
+)
+
+pairscatter_colorcoded(
+    df_merged_original[(df_merged_original['Source'] == 'Old') & (df_merged_original['Runtime (sec)'] < 5000)],
+    'Theta', 'Runtime (sec)', 'Perplexity'
+)
+
+df_merged_original[df_merged_original['Stress'] > 1]['Final momentum'].describe()
+df_merged_original[df_merged_original['Final momentum'] > 0.95]['Stress'].describe()
+
+identify_outliers(df_merged_original[df_merged_original['Source'] == 'New'], 'Stress')
+identify_outliers(df_merged_original[df_merged_original['Source'] == 'New'], 'T(300)')
+identify_outliers(df_merged_original[df_merged_original['Source'] == 'New'], 'T(30)')
+identify_outliers(df_merged_original[df_merged_original['Source'] == 'Old'], 'Stress')
+identify_outliers(df_merged_original[df_merged_original['Source'] == 'Old'], 'T(300)')
+identify_outliers(df_merged_original[df_merged_original['Source'] == 'Old'], 'T(30)')
+
+
+fm_limit = 0.95
+runtime_limit = 2000
+df_merged_original[df_merged_original['Runtime (sec)'] >= runtime_limit]['Theta'].describe() # rm 112, with theta in [0.1, 0.45]
+
+df_merged_clean = df_merged_original[(df_merged_original['Runtime (sec)'] < runtime_limit) & (df_merged_original['Final momentum'] < fm_limit)]
+df_merged_clean.describe()
+# dump(df_merged_clean, 'output/df_merged_clean.joblib')
+
+df_merged_original[df_merged_original['Runtime (sec)'] >= runtime_limit][['Theta', 'Perplexity']].describe()
+df_merged_original[df_merged_original['Theta'] <= 0.45]['Runtime (sec)'].describe()
+
+
+plot_scatter_with_regression(
+    df_merged_clean, parameters, outcomes,
+    color_by='Source', legend=False,
+    fm_thresholds=None,
+    figsize=(12, 8),
+    label_offset=-0.4)
+
+pairscatter_colorcoded(
+    df_merged_clean[df_merged_clean['Source'] == 'Old'],
+    'Perplexity', 'Runtime (sec)', 'Theta'
+)
+
+pairscatter_colorcoded(
+    df_merged_clean,
+    'Perplexity', 'Runtime (sec)', 'Theta'
+)
+
+plot_scatter_with_regression(
+    df_merged_clean[df_merged_clean['Theta'] > 0.5], ['Perplexity'], ['Runtime (sec)'],
+    color_by='Source', legend=False,
+    fm_thresholds=None,
+    figsize=(12, 8),
+    label_offset=-0.4)
+
+plot_scatter_with_regression(
+    df_merged_clean[df_merged_clean['Theta'] > 0.5], parameters, outcomes,
+    color_by='Source', legend=False,
+    fm_thresholds=None,
+    figsize=(12, 8),
+    label_offset=-0.4)
+
+cor_df_new, significant_new, p_value_new = corr_with_pvalues(df_merged_clean[df_merged_clean['Source'] == 'New'].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
+cor_df_old, significant_old, p_value_old = corr_with_pvalues(df_merged_clean[df_merged_clean['Source'] == 'Old'].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
+
+limit = 0.45
+cor_df_new_theta, significant_new_theta, p_values_new_theta = corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Theta'] >= limit)].drop(columns=['Source', 'Combination'], inplace=False))
+cor_df_old_theta, significant_old_theta, p_values_old_theta = corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Theta'] >= limit)].drop(columns=['Source', 'Combination'], inplace=False))
+
+cor_df_new_theta_below, significant_new_theta_below, _ = corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Theta'] < limit)].drop(columns=['Source', 'Combination'], inplace=False))
+cor_df_old_theta_below, significant_old_theta_below, _ = corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Theta'] < limit)].drop(columns=['Source', 'Combination'], inplace=False))
+
+
+plot_scatter_with_regression(
+    df_merged_clean,
+    parameters, outcomes,
+    color_by='Source', legend=False,
+    fm_thresholds=None,
+    figsize=(12, 8),
+    label_offset=-0.4,
+    theta_threshold=0.45)
+
+
+perplexity_limit = 47
+theta_new_limit = 0.25
+
+corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Perplexity'] > 25)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
+corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Perplexity'] > 40)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
+corr_with_pvalues(df_merged_clean.drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
+
+plot_scatter_with_regression(
+    df_merged_clean,
+    ['Final momentum'],
+    ['T(300)'],
+    color_by='Source')
+
+pairscatter_colorcoded(
+    df_merged_clean[df_merged_clean['Source'] == 'Old'],
+    'Theta', 'Stress',
+    color_col='Perplexity'
+)
+
+pairscatter_colorcoded(
+    df_merged_clean,
+    'Perplexity', 'T(30)',
+    color_col='Theta'
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
 identify_outliers(df_metrics, 'Stress')
 
 # Scatter plot with and without distortion from high final momentum
 sub_outcomes = ['KL', 'T(30)', 'T(300)']
 plot_scatter_with_regression(
     df_metrics, parameters, sub_outcomes,
-    label_offset=-0.5, save_path = None, font_size=11,
+    label_offset=None, save_path = None, font_size=11,
     font_size_ticks = 11, figsize=(10,5)
 )
 
@@ -335,7 +489,7 @@ df_metrics_no_distortion = df_metrics[df_metrics['Final momentum'] < 0.96].drop(
 df_metrics_no_distortion['Final momentum'].max()
 plot_scatter_with_regression(
     df_metrics_no_distortion, parameters, sub_outcomes,
-    label_offset=-0.5, save_path = None, font_size=11,
+    label_offset=None, save_path = None, font_size=11,
     font_size_ticks = 11, figsize=(10,5)
 )
 
@@ -403,9 +557,20 @@ plot_scatter_with_regression(df_metrics_merged_no_dist, parameters, ['Stress', '
 
 df_metrics_merged2 = pd.concat([df_metrics, df_metrics_old], axis=0)
 plot_scatter_with_regression(df_metrics_merged2, parameters, sub_outcomes, color_by='Source', legend=False)
+plot_scatter_with_regression(df_metrics_merged2, parameters, ['Stress', 'Runtime (sec)'], color_by='Source', legend=False)
+plot_scatter_with_regression(df_metrics_merged2[df_metrics_merged2['Runtime (sec)'] < 2000], parameters, ['Stress', 'Runtime (sec)'], color_by='Source', legend=False)
+plot_scatter_with_regression(df_metrics_merged2[df_metrics_merged2['Runtime (sec)'] < 2000], parameters, sub_outcomes, color_by='Source', legend=False)
+
+data_work = df_metrics_merged2[df_metrics_merged2['Runtime (sec)'] < 2000]
+dump(data_work, 'output/df_merged_old_runtimeSec_below2000.joblib')
+
+data = load('output/df_merge_with_FMoutliers_momentum.joblib')
+plot_scatter_with_regression(data, parameters, sub_outcomes, color_by='Source', legend=False)
+plot_scatter_with_regression(data, parameters, ['Stress', 'Runtime (sec)'], color_by='Source', legend=False)
 
 
-sns.histplot(data=df_metrics_old[df_metrics_old['Runtime (sec)'] < 1000], x='Runtime (sec)', hue='Perplexity', bins=30, legend=False)
+
+sns.histplot(data=df_metrics_old[df_metrics_old['Runtime (sec)'] < 5000], x='Runtime (sec)', hue='Perplexity', bins=30, legend=False)
 plt.show()
 
 
@@ -469,7 +634,7 @@ sig_correlations_clean12 = cor_df_clean12[significant_clean12].stack().dropna()
 print("Significant correlations (Bonferroni-adjusted):")
 print(sig_correlations_clean12)
 
-pairscatter_colorcoded(df, 'Final momentum', 'T(300)', 'Perplexity', figsize=(10, 6))
+pairscatter_colorcoded(df, 'Early exaggeration', 'Stress', 'Perplexity', figsize=(10, 6))
 
 
 
@@ -480,6 +645,8 @@ df_metrics_old_rm_time = df_metrics_old[df_metrics_old['Runtime (sec)'] <= 1000]
 df_metrics_old_rm_time.shape
 df_metrics_old_rm_time.columns
 np.unique(df_metrics_old_rm_time['Source'])
+pairscatter_colorcoded(df_metrics_old_rm_time, 'Perplexity', 'Stress', 'Early exaggeration', figsize=(10, 6))
+
 
 df_merge_with_FMoutliers = pd.concat([df_metrics, df_metrics_old_rm_time], axis=0)
 df_merge_with_FMoutliers.shape
