@@ -285,6 +285,57 @@ def identify_outliers(df, column):
 
     return lower_bound, upper_bound
 
+def corr_plot(corr_data, significant, figsize=(13,10), rotation_x_tick=30, fontsize=14, rows=None, top_margin = 0.95, bottom_margin = 0.05, width_padding = 0.5):
+    """
+    Plot correlation heatmap showing only significant correlations.
+    
+    Parameters:
+    - corr_data: Correlation matrix from corr_with_pvalues
+    - significant: Boolean matrix indicating significant correlations from corr_with_pvalues
+    - figsize: Figure size tuple
+    - rotation_x_tick: Rotation angle for x-axis labels
+    - fontsize: Font size for labels
+    - rows: Optional list of row indices to show. If provided, will show correlations for these rows with all columns
+    - width_padding: Width padding
+    """
+    # Create a copy of correlation data and mask non-significant values
+    corr_masked = corr_data.copy()
+    corr_masked[~significant] = np.nan
+    
+    # If rows are specified, select those rows but keep all columns
+    if rows is not None:
+        corr_masked = corr_masked.iloc[rows, :]
+        significant = significant.iloc[rows, :]
+    
+    # Create figure
+    plt.figure(figsize=figsize)
+    
+    # Create heatmap
+    cmap = sns.diverging_palette(230, 20, as_cmap=True)
+    heatmap = sns.heatmap(
+        corr_masked, 
+        cmap=cmap, 
+        vmin=corr_data.min().min(), 
+        vmax=corr_data.max().max(), 
+        center=0,
+        square=True, 
+        linewidths=.5, 
+        cbar=False,  # Remove colorbar
+        annot=True, 
+        fmt=".2f"
+    )
+    
+    # Format labels
+    heatmap.xaxis.tick_top()
+    heatmap.set_xticklabels(heatmap.get_xticklabels(), fontsize=fontsize, rotation=rotation_x_tick, ha='left')
+    heatmap.set_yticklabels(heatmap.get_yticklabels(), fontsize=fontsize, rotation=0, ha='right')
+    
+    # Adjust layout to reduce margins
+    plt.tight_layout(w_pad=width_padding)
+    # plt.subplots_adjust(top=top_margin, bottom=bottom_margin)  # Adjust top and bottom margins
+    
+    plt.show()
+
 
 df_metrics = load('output/df_metric_final_wresults_stressTrust.joblib')
 df_metrics['Source'] = 'New'
@@ -332,12 +383,16 @@ plot_scatter_with_regression(
     ['Stress', 'Runtime (sec)'], color_by='Source',
     legend=False, fm_thresholds=[0.95, 0.96],
     figsize=(15, 8))
+
 plot_scatter_with_regression(
     df_merged_original, parameters, outcomes,
     color_by='Source', legend=False,
     fm_thresholds=[0.95],
     figsize=(12, 8),
-    label_offset=-0.4)
+    label_offset=-0.7,
+    font_size=16,
+    font_size_ticks=14
+    )
 
 
 df_merged_original[df_merged_original['Stress'] > 1]['Final momentum'].describe()
@@ -389,9 +444,12 @@ df_merged_original[df_merged_original['Theta'] <= 0.45]['Runtime (sec)'].describ
 plot_scatter_with_regression(
     df_merged_clean, parameters, outcomes,
     color_by='Source', legend=False,
-    fm_thresholds=None,
+    fm_thresholds=[0.95],
     figsize=(12, 8),
-    label_offset=-0.4)
+    label_offset=-0.7,
+    font_size=16,
+    font_size_ticks=14
+    )
 
 pairscatter_colorcoded(
     df_merged_clean[df_merged_clean['Source'] == 'Old'],
@@ -441,8 +499,8 @@ plot_scatter_with_regression(
 perplexity_limit = 47
 theta_new_limit = 0.25
 
-corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Perplexity'] > 25)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
-corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Perplexity'] > 40)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
+corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Perplexity'] < 40)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
+corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Perplexity'] < 40)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
 corr_with_pvalues(df_merged_clean.drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
 
 plot_scatter_with_regression(
@@ -452,18 +510,27 @@ plot_scatter_with_regression(
     color_by='Source')
 
 pairscatter_colorcoded(
-    df_merged_clean[df_merged_clean['Source'] == 'Old'],
-    'Theta', 'Stress',
+    df_merged_clean[(df_merged_clean['Source'] == 'Old')],
+    'Theta', 'T(30)',
     color_col='Perplexity'
 )
 
 pairscatter_colorcoded(
     df_merged_clean,
-    'Perplexity', 'T(30)',
-    color_col='Theta'
+    'Theta', 'T(30)',
+    color_col='Perplexity'
 )
 
 
+corr_plot(corr_data=cor_df_old, significant=significant_old, figsize=(12, 8), fontsize=12, rotation_x_tick=0)
+rows = [0,4]
+corr_plot(corr_data=cor_df_old, significant=significant_old, rows = rows,
+          figsize=(8, 4), fontsize=10, rotation_x_tick=0,
+          top_margin=0.99, bottom_margin=0.01)
+rows = [0,3,4]
+corr_plot(corr_data=cor_df_new, significant=significant_new, rows = rows,
+          figsize=(8, 4), fontsize=10, rotation_x_tick=0,
+          top_margin=0.99, bottom_margin=0.01)
 
 
 
@@ -475,390 +542,186 @@ pairscatter_colorcoded(
 
 
 
-identify_outliers(df_metrics, 'Stress')
 
-# Scatter plot with and without distortion from high final momentum
-sub_outcomes = ['KL', 'T(30)', 'T(300)']
-plot_scatter_with_regression(
-    df_metrics, parameters, sub_outcomes,
-    label_offset=None, save_path = None, font_size=11,
-    font_size_ticks = 11, figsize=(10,5)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def analyze_correlation_by_perplexity(data, x='Theta', y='T(30)', perplexity_col='Perplexity', perplexity_bins=None):
+    """
+    Calculate and plot Spearman's correlation between two variables for different Perplexity levels.
+    
+    Parameters:
+    - data: DataFrame containing the data
+    - x: First variable name (default: 'Theta')
+    - y: Second variable name (default: 'T(30)')
+    - perplexity_col: Name of the Perplexity column
+    - perplexity_bins: List of perplexity values to use as bin edges. If None, will use quantiles
+    """
+    if perplexity_bins is None:
+        # Use quantiles to create bins
+        perplexity_bins = data[perplexity_col].quantile([0, 0.25, 0.5, 0.75, 1.0]).tolist()
+    
+    # Calculate correlations for each bin
+    correlations = []
+    p_values = []
+    bin_means = []
+    
+    for i in range(len(perplexity_bins)-1):
+        lower = perplexity_bins[i]
+        upper = perplexity_bins[i+1]
+        
+        # Get data for this perplexity range
+        mask = (data[perplexity_col] >= lower) & (data[perplexity_col] < upper)
+        subset = data[mask]
+        
+        if len(subset) > 0:
+            # Calculate Spearman correlation
+            corr, p_val = stats.spearmanr(subset[x], subset[y])
+            correlations.append(corr)
+            p_values.append(p_val)
+            bin_means.append(subset[perplexity_col].mean())
+    
+    # Create plot
+    plt.figure(figsize=(10, 6))
+    
+    # Plot correlation coefficients
+    plt.plot(bin_means, correlations, 'bo-', label='Spearman correlation')
+    
+    # Add significance markers
+    for i, (corr, p_val, mean) in enumerate(zip(correlations, p_values, bin_means)):
+        if p_val < 0.05:
+            plt.plot(mean, corr, 'r*', markersize=15)
+    
+    # Add horizontal line at 0
+    plt.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
+    
+    # Add labels and title
+    plt.xlabel('Mean Perplexity in bin')
+    plt.ylabel('Spearman correlation')
+    plt.title(f'Correlation between {x} and {y} by Perplexity level')
+    
+    # Add legend
+    plt.legend(['Correlation', 'Significant (p < 0.05)'])
+    
+    plt.grid(True, alpha=0.3)
+    plt.show()
+    
+    # Print detailed results
+    print("\nDetailed results:")
+    print("Perplexity range\tMean Perplexity\tCorrelation\tp-value")
+    print("-" * 70)
+    for i in range(len(perplexity_bins)-1):
+        print(f"{perplexity_bins[i]:.1f}-{perplexity_bins[i+1]:.1f}\t\t{bin_means[i]:.1f}\t\t{correlations[i]:.3f}\t\t{p_values[i]:.3f}")
+
+# Example usage:
+analyze_correlation_by_perplexity(
+    df_merged_clean[df_merged_clean['Source'] == 'Old'],
+    x='Theta',
+    y='T(30)',
+    perplexity_col='Perplexity',
+    perplexity_bins=[0, 20, 40, 60, 80, 100]  # You can adjust these bins
 )
 
-df_metrics_no_distortion = df_metrics[df_metrics['Final momentum'] < 0.96].drop(columns=['Combination'], inplace=False)
-df_metrics_no_distortion['Final momentum'].max()
-plot_scatter_with_regression(
-    df_metrics_no_distortion, parameters, sub_outcomes,
-    label_offset=None, save_path = None, font_size=11,
-    font_size_ticks = 11, figsize=(10,5)
+def plot_variance_by_perplexity(data, y='T(30)', perplexity_col='Perplexity', perplexity_bins=None):
+    """
+    Create a bar plot showing variance of a variable across different Perplexity levels.
+    
+    Parameters:
+    - data: DataFrame containing the data
+    - y: Variable to analyze (default: 'T(30)')
+    - perplexity_col: Name of the Perplexity column
+    - perplexity_bins: List of perplexity values to use as bin edges. If None, will use quantiles
+    """
+    if perplexity_bins is None:
+        # Use quantiles to create bins
+        perplexity_bins = data[perplexity_col].quantile([0, 0.25, 0.5, 0.75, 1.0]).tolist()
+    
+    # Calculate statistics for each bin
+    variances = []
+    means = []
+    bin_labels = []
+    counts = []
+    
+    for i in range(len(perplexity_bins)-1):
+        lower = perplexity_bins[i]
+        upper = perplexity_bins[i+1]
+        
+        # Get data for this perplexity range
+        mask = (data[perplexity_col] >= lower) & (data[perplexity_col] < upper)
+        subset = data[mask]
+        
+        if len(subset) > 0:
+            variances.append(subset[y].var())
+            means.append(subset[y].mean())
+            bin_labels.append(f'{lower:.0f}-{upper:.0f}')
+            counts.append(len(subset))
+    
+    # Create figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12), height_ratios=[3, 1])
+    
+    # Plot variances
+    bars = ax1.bar(bin_labels, variances, alpha=0.7)
+    
+    # Add mean values as points
+    ax1.plot(bin_labels, means, 'ro-', label='Mean')
+    
+    # Add labels and title
+    ax1.set_xlabel('Perplexity Range')
+    ax1.set_ylabel(f'Variance of {y}')
+    ax1.set_title(f'Variance of {y} by Perplexity Level')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # Rotate x-axis labels for better readability
+    ax1.tick_params(axis='x', rotation=45)
+    
+    # Add sample sizes as text above bars
+    for bar, count in zip(bars, counts):
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height,
+                f'n={count}',
+                ha='center', va='bottom')
+    
+    # Plot sample sizes
+    ax2.bar(bin_labels, counts, alpha=0.7, color='gray')
+    ax2.set_xlabel('Perplexity Range')
+    ax2.set_ylabel('Sample Size')
+    ax2.tick_params(axis='x', rotation=45)
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Print detailed results
+    print("\nDetailed results:")
+    print("Perplexity range\tSample size\tMean\tVariance")
+    print("-" * 60)
+    for i in range(len(bin_labels)):
+        print(f"{bin_labels[i]}\t\t{counts[i]}\t\t{means[i]:.3f}\t{variances[i]:.3f}")
+
+# Example usage:
+plot_variance_by_perplexity(
+    df_merged_clean[df_merged_clean['Source'] == 'Old'],
+    y='T(30)',
+    perplexity_col='Perplexity',
+    perplexity_bins=[0, 20, 40, 60, 80, 100]  # You can adjust these bins
 )
-
-cor_df_momemtum, significant_momentum = corr_with_pvalues(df_metrics_no_distortion)
-sig_correlations_momentum = cor_df_momemtum[significant_momentum].stack().dropna()
-print("Significant correlations (Bonferroni-adjusted):")
-print(sig_correlations_momentum)
-
-
-
-out = 'T(300)'
-param = 'Perplexity'
-color_col = 'Final momentum'
-pairscatter_colorcoded(df_metrics_no_distortion[df_metrics_no_distortion['Final momentum'] < 0.90], param, out, color_col)
-
-data = df_metrics_no_distortion[df_metrics_no_distortion['Final momentum'] < 0.94]
-plot_scatter_with_regression(data, parameters, sub_outcomes)
-
-cor_df_momemtum_090, significant_momentum_090 = corr_with_pvalues(data.drop(columns=['Source'], inplace=False))
-sig_correlations_momentum_90 = cor_df_momemtum_090[significant_momentum_090].stack().dropna()
-print("Significant correlations (Bonferroni-adjusted):")
-print(sig_correlations_momentum_90)
-
-
-lower_time, upper_time = identify_outliers(df_metrics, 'Runtime (sec)')
-df_metrics_no_outliers_time = df_metrics[(df_metrics['Runtime (sec)'] > lower_time) & (df_metrics['Runtime (sec)'] < upper_time)]
-df_metrics_no_outliers_time = df_metrics_no_outliers_time.drop(columns=['Combination'])
-data_2 = df_metrics_no_outliers_time[df_metrics_no_outliers_time['Final momentum'] < 0.92]
-plot_scatter_with_regression(data_2, parameters, sub_outcomes)
-plot_scatter_with_regression(df_metrics, parameters, sub_outcomes)
-
-
-# Previous results
-df_metrics_old = pd.read_csv("output/df_metric_momentum_wresults.csv")
-df_metrics_old.rename(
-    columns={'Early_exaggeration': 'Early exaggeration',
-             'Initial_momentum': 'Initial momentum',
-             'Final_momentum': 'Final momentum',
-             'tSNE_runtime_min': 'Runtime (min)',
-             'KL_divergence': 'KL',
-             'trust_k30': 'T(30)',
-             'trust_k300': 'T(300)',
-             'stress': 'Stress'
-}, inplace=True)
-df_metrics_old['Runtime (sec)'] = df_metrics_old['Runtime (min)'] * 60
-lower_bound_time, upper_bound_time = identify_outliers(df_metrics_old, 'Runtime (sec)')
-df_metrics_old['Runtime (sec)'].min(), df_metrics_old['Runtime (sec)'].max()
-df_metrics_old['Combination'].isin(df_metrics['Combination']).sum() # 0
-df_metrics_old['Source'] = 'Old'
-df_metrics['Source'] = 'New'
-
-df_metrics_old_no_outliers = df_metrics_old[(df_metrics_old['Runtime (sec)'] > lower_bound_time) & (df_metrics_old['Runtime (sec)'] < upper_bound_time)]
-df_metrics_merged = pd.concat([df_metrics, df_metrics_old_no_outliers], axis=0)
-len(df_metrics_merged['Combination'].unique())
-df_metrics_merged.shape
-
-plot_scatter_with_regression(df_metrics_merged, parameters, sub_outcomes, color_by='Source')
-plot_scatter_with_regression(df_metrics_merged, parameters, ['Stress', 'Runtime (sec)'])
-
-df_metrics_no_distortion['Source'] = 'New'
-df_metrics_merged_no_dist = pd.concat([df_metrics_no_distortion, df_metrics_old_no_outliers], axis=0)
-plot_scatter_with_regression(df_metrics_merged_no_dist, parameters, sub_outcomes, color_by='Source')
-plot_scatter_with_regression(df_metrics_merged_no_dist, parameters, ['Stress', 'Runtime (sec)'], color_by='Source')
-
-
-df_metrics_merged2 = pd.concat([df_metrics, df_metrics_old], axis=0)
-plot_scatter_with_regression(df_metrics_merged2, parameters, sub_outcomes, color_by='Source', legend=False)
-plot_scatter_with_regression(df_metrics_merged2, parameters, ['Stress', 'Runtime (sec)'], color_by='Source', legend=False)
-plot_scatter_with_regression(df_metrics_merged2[df_metrics_merged2['Runtime (sec)'] < 2000], parameters, ['Stress', 'Runtime (sec)'], color_by='Source', legend=False)
-plot_scatter_with_regression(df_metrics_merged2[df_metrics_merged2['Runtime (sec)'] < 2000], parameters, sub_outcomes, color_by='Source', legend=False)
-
-data_work = df_metrics_merged2[df_metrics_merged2['Runtime (sec)'] < 2000]
-dump(data_work, 'output/df_merged_old_runtimeSec_below2000.joblib')
-
-data = load('output/df_merge_with_FMoutliers_momentum.joblib')
-plot_scatter_with_regression(data, parameters, sub_outcomes, color_by='Source', legend=False)
-plot_scatter_with_regression(data, parameters, ['Stress', 'Runtime (sec)'], color_by='Source', legend=False)
-
-
-
-sns.histplot(data=df_metrics_old[df_metrics_old['Runtime (sec)'] < 5000], x='Runtime (sec)', hue='Perplexity', bins=30, legend=False)
-plt.show()
-
-
-sns.kdeplot(data=df_metrics_merged, x='Perplexity', hue='Source', fill=True)
-plt.show()
-
-sns.kdeplot(data=df_metrics_merged, x='Final momentum', hue='Source', fill=True)
-plt.show()
-
-sns.kdeplot(data=df_metrics_merged, x='T(30)', hue='Source', fill=True)
-plt.show()
-
-
-sns.scatterplot(data=df_metrics_merged, x='Perplexity', y='T(30)', hue='Final momentum', style='Source')
-plt.show()
-
-sns.lmplot(data=df_metrics_merged, x='Perplexity', y='T(30)', hue='Source', ci=None)
-plt.show()
-
-
-
-comb_old = df_metrics_old_no_outliers['Combination'].to_list()
-comb_old = [ast.literal_eval(x) for x in comb_old]
-# dump(comb_old, 'output/comb_reran_momentum.joblib')
-
-combinations = load('output/parameter_combinations.joblib')
-len(combinations) #600
-len(set(combinations).intersection(set(comb_old))) #441
-len(np.setdiff1d(comb_old, combinations))
-len(set(comb_old) - set(combinations)) # 0
-
-combinations_new = df_metrics['Combination'].to_list()
-len(set(combinations).intersection(set(combinations_new)))
-len(np.setdiff1d(combinations_new, combinations))
-len(set(combinations_new) - set(combinations)) # 0
-
-
-len(np.setdiff1d(comb_old, combinations_new)) # 0
-
-
-
-data_clean_2 = df_metrics_merged_no_dist[df_metrics_merged_no_dist['Final momentum'] < 0.90]
-plot_scatter_with_regression(data_clean_2, parameters, sub_outcomes, color_by='Source', legend=False)
-
-cor_df_clean1, significant_clean1 = corr_with_pvalues(data_clean_2[data_clean_2['Source'] == 'Old'].drop(columns=['Source', 'Combination'], inplace=False))
-sig_correlations_clean1 = cor_df_clean1[significant_clean1].stack().dropna()
-print("Significant correlations (Bonferroni-adjusted):")
-print(sig_correlations_clean1)
-
-cor_df_clean2, significant_clean2 = corr_with_pvalues(data_clean_2[data_clean_2['Source'] == 'New'].drop(columns=['Source', 'Combination'], inplace=False))
-sig_correlations_clean2 = cor_df_clean2[significant_clean2].stack().dropna()
-print("Significant correlations (Bonferroni-adjusted):")
-print(sig_correlations_clean2)
-
-pairscatter_colorcoded(data_clean_2[data_clean_2['Source'] == 'Old'], 'Final momentum', 'T(300)', 'Perplexity', figsize=(10, 6))
-
-df = data_clean_2[data_clean_2['Source'] == 'Old']
-df = df[df['Perplexity'] > 60]
-cor_df_clean12, significant_clean12 = corr_with_pvalues(df.drop(columns=['Source', 'Combination'], inplace=False))
-sig_correlations_clean12 = cor_df_clean12[significant_clean12].stack().dropna()
-print("Significant correlations (Bonferroni-adjusted):")
-print(sig_correlations_clean12)
-
-pairscatter_colorcoded(df, 'Early exaggeration', 'Stress', 'Perplexity', figsize=(10, 6))
-
-
-
-identify_outliers(df_metrics_old, 'Runtime (sec)')
-df_metrics_old['Runtime (sec)'].min(), df_metrics_old['Runtime (sec)'].max()
-(df_metrics_old['Runtime (sec)'] > 1000).sum()
-df_metrics_old_rm_time = df_metrics_old[df_metrics_old['Runtime (sec)'] <= 1000]
-df_metrics_old_rm_time.shape
-df_metrics_old_rm_time.columns
-np.unique(df_metrics_old_rm_time['Source'])
-pairscatter_colorcoded(df_metrics_old_rm_time, 'Perplexity', 'Stress', 'Early exaggeration', figsize=(10, 6))
-
-
-df_merge_with_FMoutliers = pd.concat([df_metrics, df_metrics_old_rm_time], axis=0)
-df_merge_with_FMoutliers.shape
-df_merge_with_FMoutliers_momentum = df_merge_with_FMoutliers[df_merge_with_FMoutliers['Final momentum'] < 0.90] 
-df_merge_with_FMoutliers_momentum.shape
-
-df1 = df_merge_with_FMoutliers_momentum[df_merge_with_FMoutliers_momentum['Source'] == 'Old']
-cor_df_clean13, significant_clean13 = corr_with_pvalues(df1.drop(columns=['Source', 'Combination'], inplace=False))
-sig_correlations_clean13 = cor_df_clean13[significant_clean13].stack().dropna()
-print("Significant correlations (Bonferroni-adjusted):")
-print(sig_correlations_clean13)
-
-df2 = df_merge_with_FMoutliers_momentum[df_merge_with_FMoutliers_momentum['Source'] == 'New']
-identify_outliers(df2, 'Runtime (sec)')
-print(df2['Runtime (sec)'].min(), df2['Runtime (sec)'].max())
-(df2['Runtime (sec)'] > 1000).sum()
-
-cor_df_clean23, significant_clean23 = corr_with_pvalues(df2.drop(columns=['Source', 'Combination'], inplace=False))
-sig_correlations_clean23 = cor_df_clean23[significant_clean23].stack().dropna()
-print("Significant correlations (Bonferroni-adjusted):")
-print(sig_correlations_clean23)
-
-
-pairscatter_colorcoded(df1, 'Final momentum', 'T(300)', 'Perplexity', figsize=(10, 6))
-pairscatter_colorcoded(df1, 'Theta', 'Stress', 'Perplexity', figsize=(10, 6))
-pairscatter_colorcoded(df1, 'Perplexity', 'Stress', 'Theta', figsize=(10, 6))
-pairscatter_colorcoded(df2, 'Perplexity', 'Stress', 'Theta', figsize=(10, 6))
-corr_with_pvalues(df1[df1['Perplexity'] > 50].drop(columns=['Source', 'Combination'], inplace=False))
-
-
-plot_scatter_with_regression(df_merge_with_FMoutliers_momentum, parameters, sub_outcomes, color_by='Source', legend=False)
-plot_scatter_with_regression(df_merge_with_FMoutliers_momentum, parameters, ['Stress', 'Runtime (sec)'], color_by='Source', legend=False)
-
-
-from sklearn.model_selection import GroupShuffleSplit
-from sklearn.model_selection import train_test_split
-
-
-features = parameters + ['Source']
-X = df_metrics_merged_no_dist[features]
-y = df_metrics_merged_no_dist['T(30)']
-
-# One-hot encode 'Source' and combine with numerical features
-X_encoded = pd.concat([X[parameters], pd.get_dummies(X['Source'], drop_first=True)], axis=1)
-
-
-# Split into train/test (80/20)
-X_train, X_test, y_train, y_test = train_test_split(X_encoded, y, test_size=0.2, random_state=42)
-
-# Low-FM regime (FM < 0.96)
-train_low = X_train['Final momentum'] < 0.96
-X_train_low = X_train[train_low]
-y_train_low = y_train[train_low]
-
-# High-FM regime (FM >= 0.96)
-train_high = X_train['Final momentum'] >= 0.96
-X_train_high = X_train[train_high]
-y_train_high = y_train[train_high]
-
-# Train Random Forest for each regime
-rf_low = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=42, max_leaf_nodes=3)
-rf_low.fit(X_train_low, y_train_low)
-
-rf_high = RandomForestRegressor(n_estimators=100, max_depth=5, random_state=42, max_leaf_nodes=3)
-rf_high.fit(X_train_high, y_train_high)
-
-
-
-# Reference = Mean of Old in low-FM
-ref_low = X_train_low[X_train_low['Old'] == True].mean().values.reshape(1, -1)
-
-# Explain model
-explainer_low = shap.TreeExplainer(rf_low, data=ref_low)
-shap_values_low = explainer_low.shap_values(X_test[X_test['Final momentum'] < 0.96])
-
-# Summary plot
-shap.summary_plot(shap_values_low, X_test[X_test['Final momentum'] < 0.96], feature_names=features)
-plt.title("SHAP Summary (Low FM, Reference: Batch1)")
-plt.show()
-
-# Dependence plot: Perplexity vs. FM interaction
-shap.dependence_plot(
-    "Perplexity", 
-    shap_values_low, 
-    X_test[X_test['Final momentum'] < 0.96], 
-    interaction_index="Final momentum",
-    show=False
-)
-plt.title("Perplexity Dependence (Low FM, Colored by FM)")
-plt.gcf().axes[0].axhline(y=0, color='red', linestyle='--')  # Reference line
-plt.show()
-
-
-# Reference = Mean of Batch1 in high-FM (if Batch1 exists in high-FM; else use low-FM)
-ref_high = X_train_high[X_train_high['Old'] == True].mean().values.reshape(1, -1)
-
-# Explain model
-explainer_high = shap.TreeExplainer(rf_high, data=ref_high)
-shap_values_high = explainer_high.shap_values(X_test[X_test['Final momentum'] >= 0.96])
-
-# Summary plot
-shap.summary_plot(shap_values_high, X_test[X_test['Final momentum'] >= 0.96], feature_names=features)
-plt.title("SHAP Summary (High FM, Reference: Batch1)")
-plt.show()
-
-# Dependence plot: FM vs. Source interaction
-shap.dependence_plot(
-    "Final Momentum", 
-    shap_values_high, 
-    X_test[X_test['Final momentum'] >= 0.96], 
-    interaction_index="Old",
-    show=False
-)
-plt.title("FM Dependence (High FM, Colored by Source)")
-plt.show()
-
-# Compare, SHAP values for 'Source' across regimes
-source_effect_low = pd.DataFrame({
-    'SHAP': shap_values_low[:, features.index('Source')],
-    'Regime': 'Low FM',
-    'Source': X_test[X_test['Final momentum'] < 0.96]['Old']
-})
-
-source_effect_high = pd.DataFrame({
-    'SHAP': shap_values_high[:, features.index('Source')],
-    'Regime': 'High FM',
-    'Source': X_test[X_test['Final momentum'] >= 0.96]['Old']
-})
-
-source_effect = pd.concat([source_effect_low, source_effect_high])
-
-# Plot batch effects
-sns.boxplot(data=source_effect, x='Regime', y='SHAP', hue='Source')
-plt.axhline(y=0, color='red', linestyle='--')
-plt.title("SHAP Values for 'Source' (Reference: Batch1)")
-plt.ylabel("Impact on T30 Relative to Batch1")
-plt.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Compare with previous results
-df_metrics_old = pd.read_csv("output/df_metric_momentum_wresults.csv")
-identify_outliers(df_metrics_old, 'Runtime (sec)')
-df_metrics_old.rename(
-    columns={'Early_exaggeration': 'Early exaggeration',
-             'Initial_momentum': 'Initial momentum',
-             'Final_momentum': 'Final momentum',
-             'tSNE_runtime_min': 'Runtime (min)',
-             'KL_divergence': 'KL',
-             'trust_k30': 'T(30)',
-             'trust_k300': 'T(300)',
-             'stress': 'Stress'
-}, inplace=True)
-df_metrics_old['Runtime (sec)'] = df_metrics_old['Runtime (min)'] * 60
-lower_bound_time, upper_bound_time = identify_outliers(df_metrics_old, 'Runtime (sec)')
-identify_outliers(df_metrics_old, 'Runtime (min)')
-
-
-plot_scatter_with_regression(df_metrics_old, parameters, sub_outcomes) #same plot as in the paper
-plot_scatter_with_regression(df_metrics_old, parameters, ['Runtime (sec)']) #same plot as in the paper
-plot_scatter_with_regression(df_metrics, parameters, ['Runtime (sec)']) #same plot as in the paper
-
-df_metrics_old['Runtime (sec)'].min(), df_metrics_old['Runtime (sec)'].max() 
-df_metrics['Runtime (sec)'].min(), df_metrics['Runtime (sec)'].max()
-
-plot_scatter_with_regression(df_metrics_old[df_metrics_old['Runtime (sec)'] <= 1050], parameters, ['Runtime (sec)'])
-plot_scatter_with_regression(df_metrics_old[df_metrics_old['Runtime (sec)'] <= 1050], parameters, sub_outcomes)
-
-
-df_metrics_old_no_outliers = df_metrics_old[(df_metrics_old['Runtime (sec)'] > lower_bound_time) & (df_metrics_old['Runtime (sec)'] < upper_bound_time)]
-
-comb_old = df_metrics_old_no_outliers['Combination']
-comb_new = df_metrics['Combination']
-
-difference_combinations = np.setdiff1d(comb_old, comb_new) # not a single overlap in combinations
-difference_combinations_original = np.setdiff1d(df_metrics_old['Combination'].unique(), comb_new) # same
-
-removed_combinations_old = df_metrics_old[~df_metrics_old['Combination'].isin(comb_old)]['Combination']
-#np.setdiff1d(df_metrics_old['Combination'].unique(), comb_old)
-
-import ast 
-tuple_list = removed_combinations_old.apply(ast.literal_eval).tolist()
-
-# Step 2: Convert to 2D NumPy array
-comb_2d = np.vstack(tuple_list)  # Shape: (54, 5)
-
-# Optional: Convert to DataFrame with column names
-df_2d_old_ = pd.DataFrame(comb_2d, columns=['Perplexity', 'Early', 'Initial', 'Final', 'Theta'])
-df_2d_old_['Theta'].min(), df_2d_old_['Theta'].max() # removed theta in range (0.1, 0.45)
-df_2d_old_['Final'].min(), df_2d_old_['Final'].max() # removed final momentum in range (0.8, 1.0)
-
-df_metrics_old_no_outliers['Theta'].min(), df_metrics_old_no_outliers['Theta'].max() # kept theta in range (0.19, 1.0)
-df_metrics_old_no_outliers['Final momentum'].min(), df_metrics_old_no_outliers['Final momentum'].max() # kept final momentum in range (0.8, 1.0)
-
-
