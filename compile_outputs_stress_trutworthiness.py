@@ -470,7 +470,7 @@ def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexit
             ax_new.set_xticks([])
         
         # Set y-label only for leftmost plots
-        ax_old.set_ylabel(f'Correlation with {y}', fontsize=font_size)
+        ax_old.set_ylabel(f'{x} and {y}', fontsize=font_size)
         ax_new.set_ylabel('')
         
         # Set y-ticks only for leftmost plots
@@ -679,26 +679,61 @@ def plot_variance_by_perplexity(data, variables, perplexity_col='Perplexity',
     plt.tight_layout()
     plt.show()
 
-def interaction_plot(data, x1, x2, y, source = None, figsize = (12, 5), fontsize = 14, rotation = 0):
-
+def interaction_plot(data, x1, x2, y, source=None, figsize=(12, 5), fontsize=14, rotation=0,
+                    x1_bins=None, x2_bins=None):
+    """
+    Create an interaction plot and scatter plot to visualize the relationship between three variables.
+    
+    Parameters:
+    - data: DataFrame containing the data
+    - x1: First variable name for x-axis
+    - x2: Second variable name for grouping/coloring
+    - y: Response variable name
+    - source: Optional filter for 'Source' column
+    - figsize: Figure size tuple
+    - fontsize: Font size for labels
+    - rotation: Rotation angle for x-axis labels
+    - x1_bins: Optional list of bin edges for x1. If None, uses qcut with 3 groups
+    - x2_bins: Optional list of bin edges for x2. If None, uses qcut with 2 groups
+    """
     if source is not None:
         data = data[data['Source'] == source]
     
     plt.figure(figsize=figsize)
 
+    # Create bins for x1
+    if x1_bins is not None:
+        x1_groups = pd.cut(data[x1], bins=x1_bins)
+    else:
+        x1_groups = pd.qcut(data[x1], 3)
+
+    # Create bins for x2
+    if x2_bins is not None:
+        x2_groups = pd.cut(data[x2], bins=x2_bins)
+    else:
+        x2_groups = pd.qcut(data[x2], 2)
+
+    # Custom color palette with blue and red tones
+    custom_palette = ['#1f77b4', '#d62728']  # Blue and red from seaborn's default palette
+
     # Plot 1: Interaction plot (categorical bins)
     plt.subplot(1, 2, 1)
     sns.pointplot(data=data, 
-                x=pd.qcut(data[x1], 3),  # Split x1 into 3 quantile-based groups
+                x=x1_groups,
                 y=y, 
-                hue=pd.qcut(data[x2], 2))  # Split x2 into 2 groups
-    # plt.title(f"Interaction Plot\n{y} by {x1} grouped by {x2}")
+                hue=x2_groups,
+                palette=custom_palette)
     plt.xticks(rotation=rotation)
+    plt.xlabel(x1, fontsize=fontsize)
+    plt.ylabel(y, fontsize=fontsize)
+    plt.legend(title=x2, fontsize=fontsize-2)
 
     # Plot 2: Scatterplot with coloring
     plt.subplot(1, 2, 2)
-    sns.scatterplot(data=data, x=x1, y=y, hue=pd.qcut(data[x2], 2))
-    # plt.title(f"Scatterplot\n{y} vs {x1} colored by {x2}")
+    sns.scatterplot(data=data, x=x1, y=y, hue=x2_groups, palette=custom_palette)
+    plt.xlabel(x1, fontsize=fontsize)
+    plt.ylabel(y, fontsize=fontsize)
+    plt.legend(title=x2, fontsize=fontsize-2)
 
     plt.tight_layout()
     plt.show()
@@ -871,6 +906,8 @@ theta_new_limit = 0.25
 
 corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Perplexity'] < 40)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
 corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Perplexity'] < 40)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
+corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Perplexity'] >= 40)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
+
 corr_with_pvalues(df_merged_clean.drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
 
 plot_scatter_with_regression(
@@ -944,6 +981,12 @@ analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_
                                   perplexity_bins_new=[0,50,155],
                                   figsize=(12,8))
 
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_list=['T(30)'],
+                                  perplexity_col='Perplexity',
+                                  perplexity_bins_old=[0,50,155],
+                                  perplexity_bins_new=[0,50,155],
+                                  figsize=(12,8))
+
 
 analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['T(30)'],
                                   perplexity_col='Perplexity',
@@ -951,6 +994,13 @@ analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['T(
                                   perplexity_bins_new=[0,50,155],
                                   figsize=(10,5),
                                   font_size=14)
+
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['Stress'],
+                                  perplexity_col='Perplexity',
+                                  perplexity_bins_old=[0,50,155],
+                                  perplexity_bins_new=[0,50,155],
+                                  figsize=(10,5),
+                                  font_size=14)                                  
 
 
 analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Perplexity', y_list=['Runtime (sec)'],
@@ -980,9 +1030,87 @@ plot_variance_by_perplexity(
 )
 
 
+interaction_plot(
+    data=df_merged_clean,
+    source='Old',
+    x1='Theta',
+    x2 = 'Perplexity',
+    y = 'Runtime (sec)')
+    #x2_bins=[0, 50, 155])
+
+interaction_plot(
+    data=df_merged_clean,
+    source='New',
+    x1='Perplexity',
+    x2 = 'Theta',
+    y = 'Runtime (sec)')
+    #x2_bins=[0, 50, 155])
+
+
+sns.kdeplot(df_merged_clean[df_merged_clean['Source'] == 'Old']['Runtime (sec)'])
+plt.show()
+
+df_merged_clean[df_merged_clean['Source'] == 'Old'].drop(columns=['Runtime (min)', 'Source', 'Combination']).corr()
 
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Create figure with two subplots
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+
+# Left plot (Old data)
+sns.scatterplot(
+    data=df_merged_clean[df_merged_clean['Source'] == 'Old'],
+    x='Theta',
+    y='T(30)',
+    hue='Perplexity',
+    palette='viridis',
+    hue_norm=(df_merged_clean['Perplexity'].min(), df_merged_clean['Perplexity'].max()),
+    ax=ax1  # Use ax1 instead of creating new subplot
+)
+
+ax1.set_title('Pretreatment 1', fontsize=14, pad=20)
+ax1.set_xlabel('Theta', fontsize=12)
+ax1.set_ylabel('T(30)', fontsize=12)
+ax1.legend(title='Perplexity', fontsize=10)
+ax1.grid(True, linestyle='--', alpha=0.6)
+
+# Right plot (New data)
+sns.scatterplot(
+    data=df_merged_clean[df_merged_clean['Source'] == 'New'],
+    x='Theta',
+    y='T(30)',
+    hue='Perplexity',
+    palette='viridis',
+    hue_norm=(df_merged_clean['Perplexity'].min(), df_merged_clean['Perplexity'].max()),
+    ax=ax2  # Use ax2 instead of creating new subplot
+)
+
+ax2.set_title('Pretreatment 2', fontsize=14, pad=20)
+ax2.set_xlabel('Theta', fontsize=12)
+ax2.set_ylabel('', fontsize=12)  # Commented out
+# ax2.legend(title='Perplexity', fontsize=10)  # Commented out
+ax2.grid(True, linestyle='--', alpha=0.6)
+
+# Adjust layout to prevent overlap
+plt.tight_layout()
+plt.show()
