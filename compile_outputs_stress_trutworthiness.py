@@ -208,7 +208,7 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
     plt.show()
 
 # Scater plot color-coding by 'Final momentum'
-def pairscatter_colorcoded(data, x, y, color_col, title=None, figsize=(10, 6), save_path=None):
+def pairscatter_colorcoded(data, x, y, color_col, title=None, figsize=(10, 6), fontsize = 14, save_path=None):
     plt.figure(figsize=figsize)
     sns.scatterplot(
         data=data,
@@ -220,8 +220,8 @@ def pairscatter_colorcoded(data, x, y, color_col, title=None, figsize=(10, 6), s
     )
     
     plt.title(title, fontsize=14)
-    plt.xlabel(x)
-    plt.ylabel(y)
+    plt.xlabel(x, fontsize = fontsize)
+    plt.ylabel(y, fontsize = fontsize)
 
     # Add a legend
     plt.legend(title=color_col)
@@ -337,162 +337,372 @@ def corr_plot(corr_data, significant, figsize=(13,10), rotation_x_tick=30, fonts
     plt.show()
 
 
-def analyze_correlation_by_perplexity(data, x='Theta', y='T(30)', perplexity_col='Perplexity', perplexity_bins=None):
+def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexity', 
+                                    perplexity_bins_old=None, perplexity_bins_new=None,
+                                    figsize=(20, 15), font_size=15, label_offset=-0.12):
     """
-    Calculate and plot Spearman's correlation between two variables for different Perplexity levels.
+    Calculate and plot Spearman's correlation between x and multiple y variables for different Perplexity levels,
+    with Old and New data side by side.
     
     Parameters:
     - data: DataFrame containing the data
-    - x: First variable name (default: 'Theta')
-    - y: Second variable name (default: 'T(30)')
+    - x: First variable name (e.g., 'Final momentum')
+    - y_list: List of second variables to analyze (e.g., ['Stress', 'T(300)'])
     - perplexity_col: Name of the Perplexity column
-    - perplexity_bins: List of perplexity values to use as bin edges. If None, will use quantiles
-    """
-    if perplexity_bins is None:
-        # Use quantiles to create bins
-        perplexity_bins = data[perplexity_col].quantile([0, 0.25, 0.5, 0.75, 1.0]).tolist()
-    
-    # Calculate correlations for each bin
-    correlations = []
-    p_values = []
-    bin_means = []
-    
-    for i in range(len(perplexity_bins)-1):
-        lower = perplexity_bins[i]
-        upper = perplexity_bins[i+1]
-        
-        # Get data for this perplexity range
-        mask = (data[perplexity_col] >= lower) & (data[perplexity_col] < upper)
-        subset = data[mask]
-        
-        if len(subset) > 0:
-            # Calculate Spearman correlation
-            corr, p_val = stats.spearmanr(subset[x], subset[y])
-            correlations.append(corr)
-            p_values.append(p_val)
-            bin_means.append(subset[perplexity_col].mean())
-    
-    # Create plot
-    plt.figure(figsize=(10, 6))
-    
-    # Plot correlation coefficients
-    plt.plot(bin_means, correlations, 'bo-', label='Spearman correlation')
-    
-    # Add significance markers
-    for i, (corr, p_val, mean) in enumerate(zip(correlations, p_values, bin_means)):
-        if p_val < 0.05:
-            plt.plot(mean, corr, 'r*', markersize=15)
-    
-    # Add horizontal line at 0
-    plt.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
-    
-    # Add labels and title
-    plt.xlabel('Mean Perplexity in bin')
-    plt.ylabel('Spearman correlation')
-    plt.title(f'Correlation between {x} and {y} by Perplexity level')
-    
-    # Add legend
-    plt.legend(['Correlation', 'Significant (p < 0.05)'])
-    
-    plt.grid(True, alpha=0.3)
-    plt.show()
-    
-    # Print detailed results
-    print("\nDetailed results:")
-    print("Perplexity range\tMean Perplexity\tCorrelation\tp-value")
-    print("-" * 70)
-    for i in range(len(perplexity_bins)-1):
-        print(f"{perplexity_bins[i]:.1f}-{perplexity_bins[i+1]:.1f}\t\t{bin_means[i]:.1f}\t\t{correlations[i]:.3f}\t\t{p_values[i]:.3f}")
-
-
-def plot_variance_by_perplexity(data, variables, perplexity_col='Perplexity', perplexity_bins=None, figsize=(12, 8), font_size=12):
-    """
-    Create bar plots showing variance of multiple variables across different Perplexity levels.
-    
-    Parameters:
-    - data: DataFrame containing the data
-    - variables: List of variables to analyze (e.g., ['T(30)', 'T(300)', 'Stress'])
-    - perplexity_col: Name of the Perplexity column
-    - perplexity_bins: List of perplexity values to use as bin edges. If None, will use quantiles
+    - perplexity_bins_old: List of perplexity values for Old data
+    - perplexity_bins_new: List of perplexity values for New data
     - figsize: Size of the figure
     - font_size: Font size for labels and titles
+    - label_offset: Vertical offset for sample size labels
     """
-    if perplexity_bins is None:
-        # Use quantiles to create bins
-        perplexity_bins = data[perplexity_col].quantile([0, 0.25, 0.5, 0.75, 1.0]).tolist()
+    if perplexity_bins_old is None:
+        perplexity_bins_old = [0, 50, 100]
+    if perplexity_bins_new is None:
+        perplexity_bins_new = [0, 50, 100]
+    
+    # Get the exact colors from seaborn's Set2 palette
+    colors = sns.color_palette('Set2')
+    old_color = colors[1]
+    new_color = colors[0]
     
     # Calculate number of rows and columns for subplots
-    n_vars = len(variables)
-    n_cols = min(2, n_vars)  # Maximum 2 columns
-    n_rows = (n_vars + 1) // 2  # Ceiling division
+    n_vars = len(y_list)
+    n_cols = 2  # One column for Old, one for New
+    n_rows = n_vars
     
-    # Create figure with subplots
+    # Create figure with subplots and adjust spacing
     fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
-    axes = axes.flatten() if n_vars > 1 else [axes]
+    plt.subplots_adjust(hspace=0.3, wspace=0.1)
     
-    # Process each variable
-    for idx, var in enumerate(variables):
-        ax = axes[idx]
+    # Handle single row case
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+    
+    # Process each y variable
+    for idx, y in enumerate(y_list):
+        # Process Old data
+        ax_old = axes[idx, 0]
+        old_data = data[data['Source'] == 'Old']
         
-        # Calculate statistics for each bin
-        variances = []
-        bin_labels = []
-        counts = []
+        # Calculate correlations for Old data
+        correlations_old = []
+        p_values_old = []
+        bin_means_old = []
+        counts_old = []
         
-        for i in range(len(perplexity_bins)-1):
-            lower = perplexity_bins[i]
-            upper = perplexity_bins[i+1]
+        for i in range(len(perplexity_bins_old)-1):
+            lower = perplexity_bins_old[i]
+            upper = perplexity_bins_old[i+1]
             
-            # Get data for this perplexity range
-            mask = (data[perplexity_col] >= lower) & (data[perplexity_col] < upper)
-            subset = data[mask]
+            mask = (old_data[perplexity_col] >= lower) & (old_data[perplexity_col] < upper)
+            subset = old_data[mask]
             
             if len(subset) > 0:
-                variances.append(subset[var].var())
-                bin_labels.append(f'{lower:.0f}-{upper:.0f}')
-                counts.append(len(subset))
+                corr, p_val = stats.spearmanr(subset[x], subset[y])
+                correlations_old.append(corr)
+                p_values_old.append(p_val)
+                bin_means_old.append(subset[perplexity_col].mean())
+                counts_old.append(len(subset))
         
-        # Plot variances
-        bars = ax.bar(bin_labels, variances, alpha=0.7)
+        # Plot Old data
+        ax_old.plot(bin_means_old, correlations_old, 'o-', color=old_color, alpha=0.7)
+        ax_old.grid(True, alpha=0.3)
         
-        # Add labels and title
-        ax.set_xlabel('Perplexity Range', fontsize=font_size)
-        ax.set_ylabel(f'Variance of {var}', fontsize=font_size)
-        ax.set_title(f'Variance of {var} by Perplexity Level', fontsize=font_size)
-        ax.grid(True, alpha=0.3)
+        # Add significance markers for Old data
+        for i, (corr, p_val, mean) in enumerate(zip(correlations_old, p_values_old, bin_means_old)):
+            if p_val < 0.05:
+                ax_old.plot(mean, corr, '*', color='red', markersize=15)
         
-        # Rotate x-axis labels for better readability
-        ax.tick_params(axis='x', rotation=45)
-        ax.tick_params(axis='both', labelsize=font_size-2)
+        # Process New data
+        ax_new = axes[idx, 1]
+        new_data = data[data['Source'] == 'New']
         
-        # Add sample sizes as text above bars
-        for bar, count in zip(bars, counts):
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height,
-                    f'n={count}',
-                    ha='center', va='bottom', fontsize=font_size-2)
-    
-    # Remove any empty subplots
-    for idx in range(len(variables), len(axes)):
-        fig.delaxes(axes[idx])
+        # Calculate correlations for New data
+        correlations_new = []
+        p_values_new = []
+        bin_means_new = []
+        counts_new = []
+        
+        for i in range(len(perplexity_bins_new)-1):
+            lower = perplexity_bins_new[i]
+            upper = perplexity_bins_new[i+1]
+            
+            mask = (new_data[perplexity_col] >= lower) & (new_data[perplexity_col] < upper)
+            subset = new_data[mask]
+            
+            if len(subset) > 0:
+                corr, p_val = stats.spearmanr(subset[x], subset[y])
+                correlations_new.append(corr)
+                p_values_new.append(p_val)
+                bin_means_new.append(subset[perplexity_col].mean())
+                counts_new.append(len(subset))
+        
+        # Plot New data
+        ax_new.plot(bin_means_new, correlations_new, 'o-', color=new_color, alpha=0.7)
+        ax_new.grid(True, alpha=0.3)
+        
+        # Add significance markers for New data
+        for i, (corr, p_val, mean) in enumerate(zip(correlations_new, p_values_new, bin_means_new)):
+            if p_val < 0.05:
+                ax_new.plot(mean, corr, '*', color='red', markersize=15)
+        
+        # Set labels and titles
+        # if idx == 0:  # First row
+        #     ax_old.set_title('Pretreatment 1', fontsize=font_size)
+        #     ax_new.set_title('Pretreatment 2', fontsize=font_size)
+        
+        if idx == len(y_list) - 1:  # Last row
+            # Add sample sizes between x-tick labels and x-axis title
+            for i, count in enumerate(counts_old):
+                ax_old.text(i, label_offset, f'(n={count})', 
+                          ha='center', va='top', transform=ax_old.transAxes,
+                          fontsize=font_size-2)
+            
+            for i, count in enumerate(counts_new):
+                ax_new.text(i, label_offset, f'(n={count})', 
+                          ha='center', va='top', transform=ax_new.transAxes,
+                          fontsize=font_size-2)
+            
+            ax_old.set_xlabel(f'Mean {perplexity_col} in bin', fontsize=font_size, labelpad=20)
+            ax_new.set_xlabel(f'Mean {perplexity_col} in bin', fontsize=font_size, labelpad=20)
+        else:
+            ax_old.set_xticks([])
+            ax_new.set_xticks([])
+        
+        # Set y-label only for leftmost plots
+        ax_old.set_ylabel(f'Correlation with {y}', fontsize=font_size)
+        ax_new.set_ylabel('')
+        
+        # Set y-ticks only for leftmost plots
+        ax_new.set_yticks([])
+        
+        # Set tick parameters
+        ax_old.tick_params(axis='y', labelsize=font_size-2)
+        
+        # Add horizontal line at 0
+        ax_old.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
+        ax_new.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
+        
+        # Set y-axis limits to be symmetric around 0
+        max_corr = max(max(abs(c) for c in correlations_old), max(abs(c) for c in correlations_new))
+        ax_old.set_ylim(-max_corr*1.1, max_corr*1.1)
+        ax_new.set_ylim(-max_corr*1.1, max_corr*1.1)
     
     plt.tight_layout()
     plt.show()
     
     # Print detailed results
     print("\nDetailed results:")
-    print("Variable\tPerplexity range\tSample size\tVariance")
-    print("-" * 60)
-    for var in variables:
-        for i in range(len(perplexity_bins)-1):
-            lower = perplexity_bins[i]
-            upper = perplexity_bins[i+1]
-            mask = (data[perplexity_col] >= lower) & (data[perplexity_col] < upper)
-            subset = data[mask]
-            if len(subset) > 0:
-                print(f"{var}\t{lower:.0f}-{upper:.0f}\t\t{len(subset)}\t\t{subset[var].var():.3f}")
+    print("Source\tVariable\tPerplexity range\tMean Perplexity\tCorrelation\tp-value\tSample size")
+    print("-" * 90)
+    
+    for source, bins, correlations, p_values, means, counts in [
+        ('Old', perplexity_bins_old, correlations_old, p_values_old, bin_means_old, counts_old),
+        ('New', perplexity_bins_new, correlations_new, p_values_new, bin_means_new, counts_new)
+    ]:
+        for i in range(len(bins)-1):
+            for y in y_list:
+                print(f"{source}\t{y}\t{bins[i]:.0f}-{bins[i+1]:.0f}\t\t{means[i]:.1f}\t\t{correlations[i]:.3f}\t{p_values[i]:.3f}\t{counts[i]}")
 
-# Example usage:
+
+
+def plot_variance_by_perplexity(data, variables, perplexity_col='Perplexity', 
+                              perplexity_bins_old=None, perplexity_bins_new=None, 
+                              figsize=(20, 15), font_size=15, label_offset=-0.12):
+    """
+    Create bar plots showing variance of multiple variables across different Perplexity levels,
+    with Old and New data side by side using consistent colors.
+    
+    Parameters:
+    - data: DataFrame containing the data
+    - variables: List of variables to analyze (e.g., ['T(30)', 'T(300)', 'Stress'])
+    - perplexity_col: Name of the Perplexity column
+    - perplexity_bins_old: List of perplexity values for Old data
+    - perplexity_bins_new: List of perplexity values for New data
+    - figsize: Size of the figure
+    - font_size: Font size for labels and titles
+    - label_offset: Vertical offset for sample size labels (default: -0.12)
+    """
+    if perplexity_bins_old is None:
+        perplexity_bins_old = [0, 50, 100]
+    if perplexity_bins_new is None:
+        perplexity_bins_new = [0, 50, 100]
+    
+    # Get the exact colors from seaborn's Set2 palette
+    colors = sns.color_palette('Set2')
+    old_color = colors[1]  #
+    new_color = colors[0]  
+    
+    # Calculate number of rows and columns for subplots
+    n_vars = len(variables)
+    n_cols = 2  # One column for Old, one for New
+    n_rows = n_vars
+    
+    # Create figure with subplots and adjust spacing
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
+    
+    # Handle single row case
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+    
+    # Adjust spacing between subplots
+    plt.subplots_adjust(hspace=0.3, wspace=0.1)
+    
+    # First pass: calculate all variances to determine y-axis limits
+    y_limits = {}
+    for var in variables:
+        max_var = 0
+        # Check Old data
+        old_data = data[data['Source'] == 'Old']
+        for i in range(len(perplexity_bins_old)-1):
+            lower = perplexity_bins_old[i]
+            upper = perplexity_bins_old[i+1]
+            mask = (old_data[perplexity_col] >= lower) & (old_data[perplexity_col] < upper)
+            subset = old_data[mask]
+            if len(subset) > 0:
+                max_var = max(max_var, subset[var].var())
+        
+        # Check New data
+        new_data = data[data['Source'] == 'New']
+        for i in range(len(perplexity_bins_new)-1):
+            lower = perplexity_bins_new[i]
+            upper = perplexity_bins_new[i+1]
+            mask = (new_data[perplexity_col] >= lower) & (new_data[perplexity_col] < upper)
+            subset = new_data[mask]
+            if len(subset) > 0:
+                max_var = max(max_var, subset[var].var())
+        
+        y_limits[var] = max_var * 1.1  # Add 10% padding
+    
+    # Process each variable
+    for idx, var in enumerate(variables):
+        # Process Old data
+        ax_old = axes[idx, 0]
+        old_data = data[data['Source'] == 'Old']
+        
+        # Calculate statistics for Old data
+        variances_old = []
+        bin_labels_old = []
+        counts_old = []
+        
+        for i in range(len(perplexity_bins_old)-1):
+            lower = perplexity_bins_old[i]
+            upper = perplexity_bins_old[i+1]
+            
+            mask = (old_data[perplexity_col] >= lower) & (old_data[perplexity_col] < upper)
+            subset = old_data[mask]
+            
+            if len(subset) > 0:
+                variances_old.append(subset[var].var())
+                # Format bin labels to show decimal places when needed
+                if any(x % 1 != 0 for x in [lower, upper]):
+                    bin_labels_old.append(f'{lower:.2f}-{upper:.2f}')
+                else:
+                    bin_labels_old.append(f'{lower:.0f}-{upper:.0f}')
+                counts_old.append(len(subset))
+        
+        # Plot Old data
+        bars_old = ax_old.bar(bin_labels_old, variances_old, alpha=0.7, color=old_color, width=0.6)
+        ax_old.grid(True, alpha=0.3)
+        
+        # Process New data
+        ax_new = axes[idx, 1]
+        new_data = data[data['Source'] == 'New']
+        
+        # Calculate statistics for New data
+        variances_new = []
+        bin_labels_new = []
+        counts_new = []
+        
+        for i in range(len(perplexity_bins_new)-1):
+            lower = perplexity_bins_new[i]
+            upper = perplexity_bins_new[i+1]
+            
+            mask = (new_data[perplexity_col] >= lower) & (new_data[perplexity_col] < upper)
+            subset = new_data[mask]
+            
+            if len(subset) > 0:
+                variances_new.append(subset[var].var())
+                # Format bin labels to show decimal places when needed
+                if any(x % 1 != 0 for x in [lower, upper]):
+                    bin_labels_new.append(f'{lower:.2f}-{upper:.2f}')
+                else:
+                    bin_labels_new.append(f'{lower:.0f}-{upper:.0f}')
+                counts_new.append(len(subset))
+        
+        # Plot New data
+        bars_new = ax_new.bar(bin_labels_new, variances_new, alpha=0.7, color=new_color, width=0.6)
+        ax_new.grid(True, alpha=0.3)
+        
+        # Set labels only for leftmost and bottom plots
+        if idx == len(variables) - 1:  # Last row
+            # Set x-tick positions and labels
+            ax_old.set_xticks(range(len(bin_labels_old)))
+            ax_old.set_xticklabels(bin_labels_old, rotation=0, fontsize=font_size-2)
+            
+            ax_new.set_xticks(range(len(bin_labels_new)))
+            ax_new.set_xticklabels(bin_labels_new, rotation=0, fontsize=font_size-2)
+            
+            # Add sample sizes between x-tick labels and x-axis title
+            for i, count in enumerate(counts_old):
+                ax_old.text(i, label_offset, f'(n={count})', 
+                          ha='center', va='top', transform=ax_old.transAxes,
+                          fontsize=font_size-2)
+            
+            for i, count in enumerate(counts_new):
+                ax_new.text(i, label_offset, f'(n={count})', 
+                          ha='center', va='top', transform=ax_new.transAxes,
+                          fontsize=font_size-2)
+            
+            # Set x-axis labels
+            ax_old.set_xlabel(f'{perplexity_col} Range', fontsize=font_size, labelpad=20)
+            ax_new.set_xlabel(f'{perplexity_col} Range', fontsize=font_size, labelpad=20)
+        else:
+            ax_old.set_xticks([])
+            ax_new.set_xticks([])
+        
+        # Set y-label only for leftmost plots
+        ax_old.set_ylabel(f'{var}', fontsize=font_size)
+        ax_new.set_ylabel('')
+        
+        # Set y-ticks only for leftmost plots
+        ax_new.set_yticks([])
+        
+        # Set tick parameters
+        ax_old.tick_params(axis='y', labelsize=font_size-2)
+        
+        # Set the same y-axis limits for both plots
+        ax_old.set_ylim(0, y_limits[var])
+        ax_new.set_ylim(0, y_limits[var])
+    
+    # Adjust layout to ensure everything fits
+    plt.tight_layout()
+    plt.show()
+
+def interaction_plot(data, x1, x2, y, source = None, figsize = (12, 5), fontsize = 14, rotation = 0):
+
+    if source is not None:
+        data = data[data['Source'] == source]
+    
+    plt.figure(figsize=figsize)
+
+    # Plot 1: Interaction plot (categorical bins)
+    plt.subplot(1, 2, 1)
+    sns.pointplot(data=data, 
+                x=pd.qcut(data[x1], 3),  # Split x1 into 3 quantile-based groups
+                y=y, 
+                hue=pd.qcut(data[x2], 2))  # Split x2 into 2 groups
+    # plt.title(f"Interaction Plot\n{y} by {x1} grouped by {x2}")
+    plt.xticks(rotation=rotation)
+
+    # Plot 2: Scatterplot with coloring
+    plt.subplot(1, 2, 2)
+    sns.scatterplot(data=data, x=x1, y=y, hue=pd.qcut(data[x2], 2))
+    # plt.title(f"Scatterplot\n{y} vs {x1} colored by {x2}")
+
+    plt.tight_layout()
+    plt.show()
+
 
 
 
@@ -651,8 +861,9 @@ plot_scatter_with_regression(
     color_by='Source', legend=False,
     fm_thresholds=None,
     figsize=(12, 8),
-    label_offset=-0.4,
-    theta_threshold=0.45)
+    label_offset=-0.6,
+    theta_threshold=0.45,
+    font_size=16)
 
 
 perplexity_limit = 47
@@ -665,19 +876,25 @@ corr_with_pvalues(df_merged_clean.drop(columns=['Source', 'Combination', 'Runtim
 plot_scatter_with_regression(
     df_merged_clean,
     parameters,
+    ['Stress'],
+    color_by='Source')
+
+plot_scatter_with_regression(
+    df_merged_clean,
+    ['Perplexity'],
     ['Runtime (sec)'],
     color_by='Source')
 
 pairscatter_colorcoded(
-    df_merged_clean[(df_merged_clean['Source'] == 'Old')],
-    'Early exaggeration', 'T(300)',
+    df_merged_clean[(df_merged_clean['Source'] == 'New')],
+    'Final momentum', 'T(300)',
     color_col='Perplexity'
 )
 
 pairscatter_colorcoded(
     df_merged_clean,
-    'Theta', 'T(30)',
-    color_col='Perplexity'
+    'Perplexity', 'Runtime (sec)',
+    color_col='Theta'
 )
 
 
@@ -693,85 +910,79 @@ corr_plot(corr_data=cor_df_new, significant=significant_new, rows = rows,
 
 
 
-analyze_correlation_by_perplexity(
-    df_merged_clean[df_merged_clean['Source'] == 'Old'],
-    x='Theta',
-    y='T(30)',
+min_perplexity = df_merged_clean['Perplexity'].min()
+max_perplexity = df_merged_clean['Perplexity'].max()
+plot_variance_by_perplexity(
+    df_merged_clean,
+    variables=outcomes,
     perplexity_col='Perplexity',
-    perplexity_bins=[0, 20, 40, 60, 80, 100]  # You can adjust these bins
+    perplexity_bins_old=[min_perplexity, 50, max_perplexity+5],
+    perplexity_bins_new=[min_perplexity, 50, max_perplexity+5],
+    figsize=(12, 8),
+    font_size=15,
+    label_offset=-0.12
 )
 
-analyze_correlation_by_perplexity(
-    df_merged_clean[df_merged_clean['Source'] == 'Old'],
-    x='Perplexity',
-    y='T(30)',
-    perplexity_col='Theta',
-    perplexity_bins=[0.2, 0.5, 0.7, 0.9, 1]  # You can adjust these bins
-)
+
+df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Perplexity'] <50)][outcomes].agg(['var', 'count'])
+df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Perplexity'] <50)][outcomes].agg(['var', 'count'])
+df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Perplexity'] >=50)][outcomes].agg(['var', 'count'])
+df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Perplexity'] >=50)][outcomes].agg(['var', 'count'])
+
+
+df_merged_clean.groupby('Source')[outcomes].std()
+
+df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Theta'] <0.45)]['Theta'].agg(['mean', 'count'])
+df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Theta'] <0.45)]['Theta'].agg(['mean', 'count'])
+df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Theta'] >=0.45)]['Theta'].agg(['mean', 'count'])
+df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Theta'] >=0.45)]['Theta'].agg(['mean', 'count'])
+
+
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_list=['T(300)', 'Stress'],
+                                  perplexity_col='Perplexity',
+                                  perplexity_bins_old=[0,50,155],
+                                  perplexity_bins_new=[0,50,155],
+                                  figsize=(12,8))
+
+
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['T(30)'],
+                                  perplexity_col='Perplexity',
+                                  perplexity_bins_old=[0,50,155],
+                                  perplexity_bins_new=[0,50,155],
+                                  figsize=(10,5),
+                                  font_size=14)
+
+
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Perplexity', y_list=['Runtime (sec)'],
+                                  perplexity_col='Theta',
+                                  perplexity_bins_old=[0,0.45,1.5],
+                                  perplexity_bins_new=[0,0.45,1.5],
+                                  figsize=(10,5),
+                                  font_size=14)
+
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Runtime (sec)', y_list=['Theta'],
+                                  perplexity_col='Perplexity',
+                                  perplexity_bins_old=[0,50,155],
+                                  perplexity_bins_new=[0,50,155],
+                                  figsize=(10,5),
+                                  font_size=14)
 
 
 plot_variance_by_perplexity(
-    df_merged_clean[df_merged_clean['Source'] == 'Old'],
-    variables=['T(30)', 'T(300)', 'Stress'],
-    perplexity_col='Perplexity',
-    perplexity_bins=[0, 50, 100],
-    figsize=(15, 10),
-    font_size=12
+    df_merged_clean,
+    variables=['Runtime (sec)'],
+    perplexity_col='Theta',
+    perplexity_bins_old=[0,0.45,1.001],
+    perplexity_bins_new=[0,0.45,1.001],
+    figsize=(10, 5),
+    font_size=14,
+    label_offset=-0.09
 )
 
 
-df_merged_clean[df_merged_clean['Source'] == 'Old'][outcomes].var()
-df_merged_clean[df_merged_clean['Source'] == 'New'][outcomes].var()
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-df = df_merged_clean.copy()
-theta_bins = [0.1, 0.2, 0.4, 0.6, 0.8, 1.0]
-perp_bins = [0, 75, 150]
-
-# Create binned columns
-df['Theta_bin'] = pd.cut(df['Theta'], bins=theta_bins, labels=[f'{theta_bins[i]:.1f}-{theta_bins[i+1]:.1f}' for i in range(len(theta_bins)-1)])
-df['Perp_bin'] = pd.cut(df['Perplexity'], bins=perp_bins, labels=[f'{perp_bins[i]}-{perp_bins[i+1]}' for i in range(len(perp_bins)-1)])
-
-# Group by both bins and compute variance
-variance_by_bins = df[(df['Source'] == 'Old')].groupby(['Theta_bin', 'Perp_bin'])['T(30)'].agg(['var', 'count']).reset_index()
-
-# Print results
-print("\nVariance of T(30) by Theta and Perplexity bins:")
-print(variance_by_bins)
-
-# Optional: Create a pivot table for easier viewing
-pivot_var = variance_by_bins.pivot(index='Theta_bin', columns='Perp_bin', values='var')
-pivot_count = variance_by_bins.pivot(index='Theta_bin', columns='Perp_bin', values='count')
-
-print("\nVariance table:")
-print(pivot_var)
-print("\nSample sizes:")
-print(pivot_count)
-
-
-df[(df['Source'] == 'Old') & (df['Perplexity'] <= 75)]['T(30)'].agg(['var', 'count'])
-df[(df['Source'] == 'Old') & (df['Perplexity'] > 75) & (df['Perplexity'] <= 150)]['T(30)'].agg(['var', 'count'])
