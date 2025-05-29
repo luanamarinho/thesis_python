@@ -17,9 +17,9 @@ sns.kdeplot(data=data, x='Final momentum', hue='Source', fill=True)
 plt.show()
 
 print(data['Final momentum'].describe()) # < 0.9
-print(data['Runtime (sec)'].describe()) # < 580
+print(data['Runtime (sec)'].describe()) # < 2000
 
-data['Source_numeric'] = data['Source'].map({'Old': 0, 'New': 1})
+data['Pretreatment'] = data['Source'].map({'Old': 1, 'New': 2})
 
 # Standardize numerical features
 # numerical_features = ['Perplexity', 'Early exaggeration', 'Initial momentum', 'Final momentum', 'Theta']
@@ -136,7 +136,7 @@ def train_decision_tree(data, source = 'New', features = None, target = None, se
     return best_model
 
 
-def plot_decision_tree(model, feature_names, figsize=(20, 10), max_depth_plot = 4, savePath=None):
+def plot_decision_tree(model, feature_names, figsize=(20, 10), max_depth_plot = 4, savePath=None, dpi=300):
     plt.figure(figsize=figsize)
     plot_tree(
         model,
@@ -145,10 +145,11 @@ def plot_decision_tree(model, feature_names, figsize=(20, 10), max_depth_plot = 
         rounded=True, 
         fontsize=10,
         max_depth=max_depth_plot)
-    plt.title("Decision Tree")
+    # plt.title("Decision Tree")
     plt.tight_layout()
     if savePath:
-        plt.savefig(savePath, dpi=300)
+        # Save as PDF with high quality
+        plt.savefig(savePath, dpi=dpi, format='pdf', bbox_inches='tight')
         print(f"Decision tree plot saved to {savePath}")
     plt.show()
 
@@ -172,13 +173,56 @@ def pairscatter_colorcoded(data, x, y, color_col, title=None, figsize=(10, 6), s
     plt.show()
 
 
+def plot_feature_importance(model, feature_names, figsize=(10, 6), fontsize = 14, savePath=None):
+    """
+    Plot feature importances as a horizontal bar plot.
+    
+    Parameters:
+    - model: Trained decision tree model
+    - feature_names: List of feature names
+    - figsize: Figure size tuple
+    - fontsize: Font size for labels and text
+    - savePath: Path to save the plot (optional)
+    """
+    # Get feature importances
+    importances = model.feature_importances_
+    
+    # Create DataFrame for plotting
+    importance_df = pd.DataFrame({
+        'Feature': feature_names,
+        'Importance': importances
+    }).sort_values('Importance', ascending=True)
+    
+    # Create plot
+    plt.figure(figsize=figsize)
+    plt.barh(importance_df['Feature'], importance_df['Importance'])
+    # plt.xlabel('Feature Importance')
+    # plt.title('Feature Importance in Decision Tree')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    
+    # Set fontsize for y-axis labels
+    plt.yticks(fontsize=fontsize)
+    
+    # Add value labels on the bars
+    for i, v in enumerate(importance_df['Importance']):
+        plt.text(v, i, f'{v:.3f}', va='center')
+    
+    plt.tight_layout()
+    
+    if savePath:
+        plt.savefig(savePath, dpi=300, format='pdf', bbox_inches='tight')
+        print(f"Feature importance plot saved to {savePath}")
+    
+    plt.show()
 
-features = ['Perplexity', 'Early exaggeration', 'Initial momentum', 'Final momentum', 'Theta', 'Source_numeric']
+
+features = ['Perplexity', 'Early exaggeration', 'Initial momentum', 'Final momentum', 'Theta', 'Pretreatment']
 features_split = ['Perplexity', 'Early exaggeration', 'Initial momentum', 'Final momentum', 'Theta']
 
 
 model_KL_full = train_decision_tree(data, source=None, features=features, target='KL', max_depth_input=4, min_samples_leaf_input=20)
 plot_decision_tree(model_KL_full, feature_names=features, max_depth_plot=4)
+plot_feature_importance(model_KL_full, feature_names=features, fontsize=12)
 
 model_Stress_full = train_decision_tree(data, source=None, features=features, target='Stress', max_depth_input=7, min_samples_leaf_input=30)
 plot_decision_tree(model_Stress_full, feature_names=features, max_depth_plot=7)
@@ -211,88 +255,4 @@ plot_decision_tree(model_runtime_full, feature_names=features, max_depth_plot=7)
 
 
 
-# 6. Text representation of the tree
-tree_rules = export_text(best_dt, feature_names=features)
-print("\nDecision Rules:")
-print(tree_rules)
-
-# 7. Interactive exploration of splits by Source
-source_values = df['Source'].unique()
-
-plt.figure(figsize=(12, 8))
-for source in source_values:
-    subset = df[df['Source'] == source]
-    plt.scatter(
-        subset['Perplexity'], 
-        subset[target],
-        alpha=0.6,
-        label=f'Source: {source}'
-    )
-
-# Add decision boundaries for Perplexity if it's used in the first few splits
-for node_id, feature_id in enumerate(best_dt.tree_.feature):
-    if node_id < 10 and feature_id == features.index('Perplexity'):
-        threshold = best_dt.tree_.threshold[node_id]
-        plt.axvline(x=threshold, color='red', linestyle='--', alpha=0.5)
-        plt.text(threshold, plt.ylim()[1]*0.9, f'Split at {threshold:.2f}', 
-                rotation=90, verticalalignment='top')
-        
-plt.xlabel('Perplexity')
-plt.ylabel(target)
-plt.title(f'Effect of Perplexity on {target} by Source')
-plt.legend()
-plt.grid(True, alpha=0.3)
-plt.tight_layout()
-# plt.savefig('perplexity_splits_KL.png', dpi=300)
-plt.show()
-
-# 8. Visualize the interaction between Perplexity and Theta
-plt.figure(figsize=(10, 8))
-scatter = plt.scatter(
-    df['Perplexity'], 
-    df['Final momentum'], 
-    c=df[target], 
-    cmap='viridis',
-    alpha=0.7,
-    s=50
-)
-plt.colorbar(scatter, label=target)
-plt.xlabel('Perplexity')
-plt.ylabel('Theta')
-plt.title(f'Interaction Effect on {target}')
-plt.grid(True, alpha=0.3)
-plt.tight_layout()
-# plt.savefig('perplexity_theta_interaction_KL.png', dpi=300)
-plt.show()
-
-# 9. Partial dependence-like visualization for top interactions
-if 'Perplexity' in feature_importance['Feature'].values[:3] and 'Theta' in feature_importance['Feature'].values[:3]:
-    # Create a grid for perplexity and theta
-    perplexity_range = np.linspace(df['Perplexity'].min(), df['Perplexity'].max(), 20)
-    theta_range = np.linspace(df['Theta'].min(), df['Theta'].max(), 5)
-    
-    plt.figure(figsize=(15, 10))
-    
-    for i, theta in enumerate(theta_range):
-        # Create synthetic data with fixed theta and varying perplexity
-        synthetic_data = df[features].copy()
-        synthetic_data['Theta'] = theta
-        
-        # For each perplexity value
-        kl_values = []
-        for perp in perplexity_range:
-            synthetic_data['Perplexity'] = perp
-            # Predict KL
-            pred_kl = best_dt.predict(synthetic_data)
-            kl_values.append(pred_kl.mean())
-        
-        plt.plot(perplexity_range, kl_values, label=f'Theta = {theta:.2f}')
-    
-    plt.xlabel('Perplexity')
-    plt.ylabel(f'Predicted {target}')
-    plt.title(f'Interaction: Effect of Perplexity on {target} at Different Theta Values')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig('perplexity_theta_partial_dependence_KL.png', dpi=300)
-    plt.show()
+data[data['Source']=='New']['KL'].describe()

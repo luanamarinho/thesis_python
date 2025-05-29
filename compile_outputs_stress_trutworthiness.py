@@ -508,7 +508,8 @@ def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexit
 
 def plot_variance_by_perplexity(data, variables, perplexity_col='Perplexity', 
                               perplexity_bins_old=None, perplexity_bins_new=None, 
-                              figsize=(20, 15), font_size=15, label_offset=-0.12):
+                              figsize=(20, 15), font_size=15, label_offset=-0.12,
+                              show_sample_sizes=True):
     """
     Create bar plots showing variance of multiple variables across different Perplexity levels,
     with Old and New data side by side using consistent colors.
@@ -522,6 +523,7 @@ def plot_variance_by_perplexity(data, variables, perplexity_col='Perplexity',
     - figsize: Size of the figure
     - font_size: Font size for labels and titles
     - label_offset: Vertical offset for sample size labels (default: -0.12)
+    - show_sample_sizes: Whether to display sample sizes below x-axis labels (default: True)
     """
     if perplexity_bins_old is None:
         perplexity_bins_old = [0, 50, 100]
@@ -643,16 +645,17 @@ def plot_variance_by_perplexity(data, variables, perplexity_col='Perplexity',
             ax_new.set_xticks(range(len(bin_labels_new)))
             ax_new.set_xticklabels(bin_labels_new, rotation=0, fontsize=font_size-2)
             
-            # Add sample sizes between x-tick labels and x-axis title
-            for i, count in enumerate(counts_old):
-                ax_old.text(i, label_offset, f'(n={count})', 
-                          ha='center', va='top', transform=ax_old.transAxes,
-                          fontsize=font_size-2)
-            
-            for i, count in enumerate(counts_new):
-                ax_new.text(i, label_offset, f'(n={count})', 
-                          ha='center', va='top', transform=ax_new.transAxes,
-                          fontsize=font_size-2)
+            # Add sample sizes between x-tick labels and x-axis title only if show_sample_sizes is True
+            if show_sample_sizes:
+                for i, count in enumerate(counts_old):
+                    ax_old.text(i, label_offset, f'(n={count})', 
+                              ha='center', va='top', transform=ax_old.transAxes,
+                              fontsize=font_size-2)
+                
+                for i, count in enumerate(counts_new):
+                    ax_new.text(i, label_offset, f'(n={count})', 
+                              ha='center', va='top', transform=ax_new.transAxes,
+                              fontsize=font_size-2)
             
             # Set x-axis labels
             ax_old.set_xlabel(f'{perplexity_col} Range', fontsize=font_size, labelpad=20)
@@ -930,7 +933,7 @@ pairscatter_colorcoded(
 
 pairscatter_colorcoded(
     df_merged_clean,
-    'Perplexity', 'Runtime (sec)',
+    'Perplexity', 'T(30)',
     color_col='Theta'
 )
 
@@ -957,7 +960,8 @@ plot_variance_by_perplexity(
     perplexity_bins_new=[min_perplexity, 50, max_perplexity+5],
     figsize=(12, 8),
     font_size=15,
-    label_offset=-0.12
+    label_offset=-0.12,
+    show_sample_sizes=True
 )
 
 
@@ -1026,8 +1030,24 @@ plot_variance_by_perplexity(
     perplexity_bins_new=[0,0.45,1.001],
     figsize=(10, 5),
     font_size=14,
-    label_offset=-0.09
+    label_offset=-0.09,
+    show_sample_sizes=True
 )
+
+theta_quantiles = df_merged_clean['Theta'].quantile([0, 0.25, 0.5, 0.75, 1.0]).tolist()
+plot_variance_by_perplexity(
+    df_merged_clean,
+    variables=['T(30)'],
+    perplexity_col='Theta',
+    perplexity_bins_old=theta_quantiles,
+    perplexity_bins_new=theta_quantiles,
+    figsize=(16, 8),
+    font_size=15,
+    label_offset=-0.09,
+    show_sample_sizes=False
+)
+
+
 
 
 interaction_plot(
