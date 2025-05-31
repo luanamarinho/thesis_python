@@ -43,20 +43,15 @@ def train_decision_tree(data, source = 'New', features = None, target = None, se
     Returns:
     - model: Trained decision tree model.
     """
+    # Set random seeds for reproducibility
+    np.random.seed(seed)
+    
     if 'Source' not in data.columns:
         raise ValueError("Data must contain 'Source' column for filtering.")
     if target not in data.columns:
         raise ValueError(f"Target '{target}' not found in data.")
     if not all(feature in data.columns for feature in features):
         raise ValueError(f"Not all features {features} found in data.")
-    
-    # Check for invalid values
-    print("\nChecking for invalid values in features and target:")
-    for feature in features + [target]:
-        invalid_count = data[feature].isna().sum()
-        inf_count = np.isinf(data[feature]).sum()
-        if invalid_count > 0 or inf_count > 0:
-            print(f"{feature}: {invalid_count} NaN values, {inf_count} infinite values")
     
     if source is not None:
         if source == 'Old':
@@ -89,7 +84,7 @@ def train_decision_tree(data, source = 'New', features = None, target = None, se
         param_grid=param_grid,
         cv=5,  # 5-fold cross-validation
         scoring='neg_mean_squared_error',
-        n_jobs=-1
+        n_jobs=1
     )
 
     grid_search.fit(X_train, y_train)
@@ -288,25 +283,23 @@ features = ['Perplexity', 'Early exaggeration', 'Initial momentum', 'Final momen
 features_split = ['Perplexity', 'Early exaggeration', 'Initial momentum', 'Final momentum', 'Theta']
 
 
-model_KL_full = train_decision_tree(data, source=None, features=features, target='KL', max_depth_input=4, min_samples_leaf_input=20)
-plot_decision_tree(model_KL_full, feature_names=features, max_depth_plot=4)
+model_KL_full = train_decision_tree(data, source=None, features=features, target='KL', max_depth_input=4, min_samples_leaf_input=25)
+plot_decision_tree(model_KL_full, feature_names=features, max_depth_plot=4, title = 'KL divergence regression tree')
 plot_feature_importance(model_KL_full, feature_names=features, fontsize=12)
+analyze_residuals(model_KL_full, X = data[features], y=data['KL'])
 
-model_T30_full = train_decision_tree(data, source=None, features=features, target='T(30)', max_depth_input=4, min_samples_leaf_input=30)
-plot_decision_tree(model_T30_full, feature_names=features, max_depth_plot=7)
-plot_feature_importance(model_T30_full, feature_names=features, fontsize=12)
 
 
 model_T30_old = train_decision_tree(data, source='Old', features=features_split, target='T(30)', max_depth_input=4, min_samples_leaf_input=10)
-plot_decision_tree(model_T30_old, feature_names=features_split, max_depth_plot=7, title = "Regression tree of T(30) \n Pretreatment 1", fontsizetitle=15)
-plot_feature_importance(model_T30_old, feature_names=features, fontsize=12)
+plot_decision_tree(model_T30_old, feature_names=features_split, max_depth_plot=7, title = "T(30) regression tree \n Pretreatment 1", fontsizetitle=15)
+plot_feature_importance(model_T30_old, feature_names=features_split, fontsize=12)
+analyze_residuals(model_T30_old, X = data[data['Source']=='Old'][features_split], y=data[data['Source']=='Old']['T(30)'])
 
 
 model_T30_new = train_decision_tree(data, source='New', features=features_split, target='T(30)', max_depth_input=4, min_samples_leaf_input=15)
-plot_decision_tree(model_T30_new, feature_names=features_split, max_depth_plot=7, title = "T(30) tree model (2)", fontsizetitle=15)
-plot_feature_importance(model_T30_new, feature_names=features, fontsize=12)
+plot_decision_tree(model_T30_new, feature_names=features_split, max_depth_plot=7, title = "T(30) regression tree \n Pretreatment 2", fontsizetitle=15)
+plot_feature_importance(model_T30_new, feature_names=features_split, fontsize=12)
 analyze_residuals(model_T30_new, X = data[data['Source']=='New'][features_split], y=data[data['Source']=='New']['T(30)'])
-
 
 
 model_Stress_full = train_decision_tree(data, source=None, features=features, target='Stress', max_depth_input=7, min_samples_leaf_input=25)
@@ -318,7 +311,7 @@ analyze_residuals(model_Stress_full, X = data[features], y=data['Stress'])
 model_runtime_full = train_decision_tree(data, source=None, features=features, target='Runtime (sec)', max_depth_input=5, min_samples_leaf_input=25)
 plot_decision_tree(model_runtime_full, feature_names=features, max_depth_plot=7)
 plot_feature_importance(model_runtime_full, feature_names=features, fontsize=12)
-analyze_residuals(model_Stress_full, X = data[features], y=data['Stress'])
+analyze_residuals(model_runtime_full, X = data[features], y=data['Runtime (sec)'])
 
 
 

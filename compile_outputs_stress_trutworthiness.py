@@ -93,7 +93,7 @@ def corr_with_pvalues(df):
     
 
 # Scatter plot
-def plot_scatter_with_regression(data, parameters, outcomes, regression_type=None, alpha=0.5, degree=1, figsize=(12, 8), font_size=12, font_size_ticks=12, label_offset=-0.4, save_path=None, legend=False, color_by=None, fm_thresholds=None, theta_threshold=None):
+def plot_scatter_with_regression(data, parameters, outcomes, regression_type=None, alpha=0.5, degree=1, figsize=(12, 8), font_size=12, font_size_ticks=12, label_offset=-0.4, save_path=None, legend=False, color_by=None, fm_thresholds=None, theta_threshold=None, perplexity_threshold=None):
     """
     Create scatter plots with optional regression lines and subplot labels.
 
@@ -113,6 +113,7 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
     - color_by: Column name to use for color coding points. Can be categorical or continuous. Default is None.
     - fm_thresholds: Value or list of values of Final momentum to draw vertical lines at. Default is None.
     - theta_threshold: Value of Theta to draw vertical line at. Default is None.
+    - perplexity_threshold: Value of Perplexity to draw vertical line at. Default is None.
     """
 
     # Calculate the number of rows and columns
@@ -162,6 +163,10 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
             if parameter == 'Theta' and theta_threshold is not None:
                 ax.axvline(x=theta_threshold, color='gray', linestyle='--', alpha=0.5)
             
+            # Add vertical line if Perplexity is on x-axis and threshold is provided
+            if parameter == 'Perplexity' and perplexity_threshold is not None:
+                ax.axvline(x=perplexity_threshold, color='blue', linestyle='--', alpha=0.5)
+            
             # Fit regression line if specified
             if regression_type == 'polyfit':
                 coeffs = np.polyfit(data[parameter], data[outcome], deg=degree)
@@ -210,13 +215,20 @@ def plot_scatter_with_regression(data, parameters, outcomes, regression_type=Non
 # Scater plot color-coding by 'Final momentum'
 def pairscatter_colorcoded(data, x, y, color_col, title=None, figsize=(10, 6), fontsize = 14, save_path=None):
     plt.figure(figsize=figsize)
+    
+    # Create a temporary Series for hue mapping if color_col is 'Source'
+    if color_col == 'Source':
+        hue_values = data[color_col].map({'Old': 1, 'New': 2})
+    else:
+        hue_values = data[color_col]
+    
     sns.scatterplot(
         data=data,
         x=x,
         y=y,
-        hue=color_col,  # Color points by 'Final momentum'
+        hue=hue_values,  # Use the mapped values for hue
         palette='viridis',  # Use the viridis colormap
-        hue_norm=(data[color_col].min(), data[color_col].max()),  # Sync scale
+        hue_norm=(hue_values.min(), hue_values.max()),  # Sync scale
     )
     
     plt.title(title, fontsize=14)
@@ -225,8 +237,6 @@ def pairscatter_colorcoded(data, x, y, color_col, title=None, figsize=(10, 6), f
 
     # Add a legend
     plt.legend(title=color_col)
-    # plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title=color_col)  # Move legend outside
-    # Show the plot
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.show()
 
@@ -339,7 +349,7 @@ def corr_plot(corr_data, significant, figsize=(13,10), rotation_x_tick=30, fonts
 
 def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexity', 
                                     perplexity_bins_old=None, perplexity_bins_new=None,
-                                    figsize=(20, 15), font_size=15, label_offset=-0.12):
+                                    figsize=(20, 15), font_size=15, label_offset=-0.12, title_offset=1):
     """
     Calculate and plot Spearman's correlation between x and multiple y variables for different Perplexity levels,
     with Old and New data side by side.
@@ -354,6 +364,7 @@ def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexit
     - figsize: Size of the figure
     - font_size: Font size for labels and titles
     - label_offset: Vertical offset for sample size labels
+    - title_offset: Vertical position of the title
     """
     if perplexity_bins_old is None:
         perplexity_bins_old = [0, 50, 100]
@@ -374,9 +385,14 @@ def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexit
     fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
     plt.subplots_adjust(hspace=0.3, wspace=0.1)
     
+    fig.suptitle(t=f'{x}', fontsize=font_size+2, y=title_offset)
+    
     # Handle single row case
     if n_rows == 1:
         axes = axes.reshape(1, -1)
+    
+    # Store results for printing
+    results = []
     
     # Process each y variable
     for idx, y in enumerate(y_list):
@@ -403,6 +419,17 @@ def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexit
                 p_values_old.append(p_val)
                 bin_means_old.append(subset[perplexity_col].mean())
                 counts_old.append(len(subset))
+                
+                # Store result for printing
+                results.append({
+                    'source': 'Old',
+                    'variable': y,
+                    'bin_range': f"{lower:.0f}-{upper:.0f}",
+                    'mean_perplexity': subset[perplexity_col].mean(),
+                    'correlation': corr,
+                    'p_value': p_val,
+                    'sample_size': len(subset)
+                })
         
         # Plot Old data
         ax_old.plot(bin_means_old, correlations_old, 'o-', color=old_color, alpha=0.7)
@@ -436,6 +463,17 @@ def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexit
                 p_values_new.append(p_val)
                 bin_means_new.append(subset[perplexity_col].mean())
                 counts_new.append(len(subset))
+                
+                # Store result for printing
+                results.append({
+                    'source': 'New',
+                    'variable': y,
+                    'bin_range': f"{lower:.0f}-{upper:.0f}",
+                    'mean_perplexity': subset[perplexity_col].mean(),
+                    'correlation': corr,
+                    'p_value': p_val,
+                    'sample_size': len(subset)
+                })
         
         # Plot New data
         ax_new.plot(bin_means_new, correlations_new, 'o-', color=new_color, alpha=0.7)
@@ -447,10 +485,6 @@ def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexit
                 ax_new.plot(mean, corr, '*', color='red', markersize=15)
         
         # Set labels and titles
-        # if idx == 0:  # First row
-        #     ax_old.set_title('Pretreatment 1', fontsize=font_size)
-        #     ax_new.set_title('Pretreatment 2', fontsize=font_size)
-        
         if idx == len(y_list) - 1:  # Last row
             # Add sample sizes between x-tick labels and x-axis title
             for i, count in enumerate(counts_old):
@@ -470,7 +504,7 @@ def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexit
             ax_new.set_xticks([])
         
         # Set y-label only for leftmost plots
-        ax_old.set_ylabel(f'{x} and {y}', fontsize=font_size)
+        ax_old.set_ylabel(f'{y}', fontsize=font_size)
         ax_new.set_ylabel('')
         
         # Set y-ticks only for leftmost plots
@@ -496,13 +530,11 @@ def analyze_correlation_by_perplexity(data, x, y_list, perplexity_col='Perplexit
     print("Source\tVariable\tPerplexity range\tMean Perplexity\tCorrelation\tp-value\tSample size")
     print("-" * 90)
     
-    for source, bins, correlations, p_values, means, counts in [
-        ('Old', perplexity_bins_old, correlations_old, p_values_old, bin_means_old, counts_old),
-        ('New', perplexity_bins_new, correlations_new, p_values_new, bin_means_new, counts_new)
-    ]:
-        for i in range(len(bins)-1):
-            for y in y_list:
-                print(f"{source}\t{y}\t{bins[i]:.0f}-{bins[i+1]:.0f}\t\t{means[i]:.1f}\t\t{correlations[i]:.3f}\t{p_values[i]:.3f}\t{counts[i]}")
+    # Sort results by source, variable, and bin range for consistent output
+    results.sort(key=lambda x: (x['source'], x['variable'], x['bin_range']))
+    
+    for r in results:
+        print(f"{r['source']}\t{r['variable']}\t{r['bin_range']}\t\t{r['mean_perplexity']:.1f}\t\t{r['correlation']:.3f}\t{r['p_value']:.3f}\t{r['sample_size']}")
 
 
 
@@ -923,19 +955,28 @@ plot_scatter_with_regression(
 plot_scatter_with_regression(
     df_merged_clean,
     ['Perplexity'],
-    ['Runtime (sec)'],
-    color_by='Source')
+    ['KL'],
+    color_by='Source',
+    label_offset=-0.1,
+    figsize=(10,6),
+    perplexity_threshold=50)
+
+pairscatter_colorcoded(
+    df_merged_clean[df_merged_clean['Source'] == 'New'],
+    'Perplexity', 'T(30)',
+    color_col='Theta'
+)
 
 pairscatter_colorcoded(
     df_merged_clean[df_merged_clean['Source'] == 'Old'],
-    'Perplexity', 'Stress',
-    color_col='Initial momentum'
+    'Perplexity', 'T(30)',
+    color_col='Theta'
 )
 
 pairscatter_colorcoded(
     df_merged_clean,
-    'Perplexity', 'Stress',
-    color_col='Final momentum'
+    'Perplexity', 'KL',
+    color_col='Source'
 )
 
 
@@ -984,7 +1025,8 @@ analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_
                                   perplexity_col='Perplexity',
                                   perplexity_bins_old=[0,50,155],
                                   perplexity_bins_new=[0,50,155],
-                                  figsize=(15,10))
+                                  figsize=(20,10),
+                                  font_size=17)
 
 analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_list=['Stress'],
                                   perplexity_col='Final momentum',
@@ -1001,17 +1043,17 @@ analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_
 
 analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['T(30)'],
                                   perplexity_col='Perplexity',
-                                  perplexity_bins_old=[32,67,155],
-                                  perplexity_bins_new=[32,67, 155],
+                                  perplexity_bins_old=[0,40,155],
+                                  perplexity_bins_new=[0,40,155],
                                   figsize=(10,5),
                                   font_size=14)
 
-analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['Stress'],
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Early exaggeration', y_list=['T(30)', 'T(300)'],
                                   perplexity_col='Perplexity',
                                   perplexity_bins_old=[0,50,155],
                                   perplexity_bins_new=[0,50,155],
-                                  figsize=(10,5),
-                                  font_size=14)                                  
+                                  figsize=(12,8),
+                                  font_size=15)                                  
 
 
 analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Perplexity', y_list=['Runtime (sec)'],
@@ -1055,6 +1097,19 @@ plot_variance_by_perplexity(
 )
 
 
+plot_variance_by_perplexity(
+    df_merged_clean,
+    variables=['KL'],
+    perplexity_col='Perplexity',
+    perplexity_bins_old=[0,50,155],
+    perplexity_bins_new=[0,50,155],
+    figsize=(10, 5),
+    font_size=14,
+    label_offset=-0.09,
+    show_sample_sizes=True
+)
+
+
 
 
 interaction_plot(
@@ -1074,8 +1129,15 @@ interaction_plot(
     #x2_bins=[0, 50, 155])
 
 
-sns.kdeplot(df_merged_clean['Perplexity'])
+sns.kdeplot(df_merged_clean['T(30)'])
 plt.show()
+
+sns.kdeplot(df_merged_clean[df_merged_clean['Source'] == 'Old']['T(30)'])
+plt.show()
+
+sns.kdeplot(df_merged_clean[df_merged_clean['Source'] == 'New']['T(30)'])
+plt.show()
+
 
 df_merged_clean[df_merged_clean['Source'] == 'Old'].drop(columns=['Runtime (min)', 'Source', 'Combination']).corr()
 
@@ -1104,38 +1166,41 @@ df_merged_clean[df_merged_clean['Source'] == 'Old'].drop(columns=['Runtime (min)
 # Create figure with two subplots
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
+x = 'Perplexity'
+y = 'T(30)'
+color_col = 'Early exaggeration'
+
 # Left plot (Old data)
 sns.scatterplot(
     data=df_merged_clean[df_merged_clean['Source'] == 'Old'],
-    x='Theta',
-    y='T(30)',
-    hue='Perplexity',
+    x=x,
+    y=y,
+    hue=color_col,
     palette='viridis',
-    hue_norm=(df_merged_clean['Perplexity'].min(), df_merged_clean['Perplexity'].max()),
-    ax=ax1  # Use ax1 instead of creating new subplot
+    hue_norm=(df_merged_clean[color_col].min(), df_merged_clean[color_col].max()),
+    ax=ax1
 )
 
 ax1.set_title('Pretreatment 1', fontsize=14, pad=20)
-ax1.set_xlabel('Theta', fontsize=12)
-ax1.set_ylabel('T(30)', fontsize=12)
-ax1.legend(title='Perplexity', fontsize=10)
+ax1.set_xlabel(f'{x}', fontsize=12)
+ax1.set_ylabel(f'{y}', fontsize=12)
+ax1.legend(title=f'{color_col}', fontsize=10)
 ax1.grid(True, linestyle='--', alpha=0.6)
 
 # Right plot (New data)
 sns.scatterplot(
     data=df_merged_clean[df_merged_clean['Source'] == 'New'],
-    x='Theta',
-    y='T(30)',
-    hue='Perplexity',
+    x=x,
+    y=y,
+    hue=color_col,
     palette='viridis',
-    hue_norm=(df_merged_clean['Perplexity'].min(), df_merged_clean['Perplexity'].max()),
-    ax=ax2  # Use ax2 instead of creating new subplot
+    hue_norm=(df_merged_clean[color_col].min(), df_merged_clean[color_col].max()),
+    ax=ax2
 )
 
 ax2.set_title('Pretreatment 2', fontsize=14, pad=20)
-ax2.set_xlabel('Theta', fontsize=12)
-ax2.set_ylabel('', fontsize=12)  # Commented out
-# ax2.legend(title='Perplexity', fontsize=10)  # Commented out
+ax2.set_xlabel(f'{x}', fontsize=12)
+ax2.set_ylabel('', fontsize=12)  # Empty y-label for right plot
 ax2.grid(True, linestyle='--', alpha=0.6)
 
 # Adjust layout to prevent overlap
