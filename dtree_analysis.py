@@ -19,7 +19,7 @@ plt.show()
 print(data['Final momentum'].describe()) # < 0.9
 print(data['Runtime (sec)'].describe()) # < 2000
 
-data['Pretreatment'] = data['Source'].map({'Old': 1, 'New': 2})
+data['Pretreatment'] = data['Source'].map({'Old': 1, 'New': 2}).astype('category')
 
 # Standardize numerical features
 # numerical_features = ['Perplexity', 'Early exaggeration', 'Initial momentum', 'Final momentum', 'Theta']
@@ -50,14 +50,22 @@ def train_decision_tree(data, source = 'New', features = None, target = None, se
     if not all(feature in data.columns for feature in features):
         raise ValueError(f"Not all features {features} found in data.")
     
+    # Check for invalid values
+    print("\nChecking for invalid values in features and target:")
+    for feature in features + [target]:
+        invalid_count = data[feature].isna().sum()
+        inf_count = np.isinf(data[feature]).sum()
+        if invalid_count > 0 or inf_count > 0:
+            print(f"{feature}: {invalid_count} NaN values, {inf_count} infinite values")
+    
     if source is not None:
         if source == 'Old':
-            source_value = 0
-        elif source == 'New':
             source_value = 1
+        elif source == 'New':
+            source_value = 2
         else:
             raise ValueError("Source must be 'Old', 'New' or None")
-        data = data[data['Source_numeric'] == source_value]  # Filter
+        data = data[data['Pretreatment'] == source_value]  # Filter
 
     # Define features and target
     X = data[features]
@@ -87,7 +95,7 @@ def train_decision_tree(data, source = 'New', features = None, target = None, se
     grid_search.fit(X_train, y_train)
     best_params = grid_search.best_params_
     best_params['max_depth'] = max_depth_input if max_depth_input else best_params['max_depth']
-    best_params['min_samples_leaf'] = min_samples_leaf_input  if min_samples_leaf_input else best_params['min_samples_leaf']
+    best_params['min_samples_leaf'] = min_samples_leaf_input  if min_samples_leaf_input is not None else best_params['min_samples_leaf']
     
     print(f"Training decision tree for {target} with source {source}...")
     print(f"Features: {features}")
@@ -136,7 +144,7 @@ def train_decision_tree(data, source = 'New', features = None, target = None, se
     return best_model
 
 
-def plot_decision_tree(model, feature_names, figsize=(20, 10), max_depth_plot = 4, savePath=None, dpi=300):
+def plot_decision_tree(model, feature_names, figsize=(20, 10), max_depth_plot = 4, savePath=None, dpi=300, title = None, fontsizetitle = 14):
     plt.figure(figsize=figsize)
     plot_tree(
         model,
@@ -145,7 +153,7 @@ def plot_decision_tree(model, feature_names, figsize=(20, 10), max_depth_plot = 
         rounded=True, 
         fontsize=10,
         max_depth=max_depth_plot)
-    # plt.title("Decision Tree")
+    plt.title(title, fontsize = fontsizetitle)
     plt.tight_layout()
     if savePath:
         # Save as PDF with high quality
@@ -216,6 +224,66 @@ def plot_feature_importance(model, feature_names, figsize=(10, 6), fontsize = 14
     plt.show()
 
 
+def analyze_residuals(model, X, y, figsize=(12, 8)):
+    """
+    Analyze residuals of the model predictions.
+    
+    Parameters:
+    - model: Trained decision tree model
+    - X: Feature matrix
+    - y: Target variable
+    - figsize: Figure size tuple
+    """
+    # Get predictions
+    y_pred = model.predict(X)
+    
+    # Calculate residuals
+    residuals = y - y_pred
+    
+    # Create subplots
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=figsize)
+    
+    # 1. Residuals vs Predicted values
+    ax1.scatter(y_pred, residuals, alpha=0.5)
+    ax1.axhline(y=0, color='r', linestyle='--')
+    ax1.set_xlabel('Predicted Values')
+    ax1.set_ylabel('Residuals')
+    ax1.set_title('Residuals vs Predicted Values')
+    
+    # 2. Residuals histogram
+    ax2.hist(residuals, bins=30, alpha=0.7)
+    ax2.set_xlabel('Residuals')
+    ax2.set_ylabel('Frequency')
+    ax2.set_title('Residuals Distribution')
+    
+    # 3. Q-Q plot
+    from scipy import stats
+    stats.probplot(residuals, dist="norm", plot=ax3)
+    ax3.set_title('Q-Q Plot')
+    
+    # 4. Residuals vs Feature (most important feature)
+    most_important_feature = X.columns[model.feature_importances_.argmax()]
+    ax4.scatter(X[most_important_feature], residuals, alpha=0.5)
+    ax4.axhline(y=0, color='r', linestyle='--')
+    ax4.set_xlabel(most_important_feature)
+    ax4.set_ylabel('Residuals')
+    ax4.set_title(f'Residuals vs {most_important_feature}')
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Print summary statistics
+    print("\nResiduals Summary Statistics:")
+    print(f"Mean: {residuals.mean():.6f}")
+    print(f"Std Dev: {residuals.std():.6f}")
+    print(f"Min: {residuals.min():.6f}")
+    print(f"Max: {residuals.max():.6f}")
+    
+    # Calculate R²
+    r2 = r2_score(y, y_pred)
+    print(f"\nR² Score: {r2:.4f}")
+
+
 features = ['Perplexity', 'Early exaggeration', 'Initial momentum', 'Final momentum', 'Theta', 'Pretreatment']
 features_split = ['Perplexity', 'Early exaggeration', 'Initial momentum', 'Final momentum', 'Theta']
 
@@ -224,32 +292,33 @@ model_KL_full = train_decision_tree(data, source=None, features=features, target
 plot_decision_tree(model_KL_full, feature_names=features, max_depth_plot=4)
 plot_feature_importance(model_KL_full, feature_names=features, fontsize=12)
 
-model_Stress_full = train_decision_tree(data, source=None, features=features, target='Stress', max_depth_input=7, min_samples_leaf_input=30)
-plot_decision_tree(model_Stress_full, feature_names=features, max_depth_plot=7)
-
-# Full does not capture difference between Old and Neww  well
-model_T30_full = train_decision_tree(data, source=None, features=features, target='T(30)', max_depth_input=7, min_samples_leaf_input=30)
+model_T30_full = train_decision_tree(data, source=None, features=features, target='T(30)', max_depth_input=4, min_samples_leaf_input=30)
 plot_decision_tree(model_T30_full, feature_names=features, max_depth_plot=7)
-
-# model_T30_old = train_decision_tree(data, source='Old', features=features_split, target='T(30)', max_depth_input=7, min_samples_leaf_input=20)
-# plot_decision_tree(model_T30_old, feature_names=features_split, max_depth_plot=7)
-# pairscatter_colorcoded(data[data['Source'] == 'Old'], x='Perplexity', y='T(30)', color_col='Theta')
-# sns.kdeplot(data=data[data['Source'] == 'Old'], x='T(30)', fill=True)
-# plt.show()
-
-# model_T30_new = train_decision_tree(data, source='New', features=features_split, target='T(30)', max_depth_input=7, min_samples_leaf_input=25)
-# plot_decision_tree(model_T30_new, feature_names=features_split, max_depth_plot=7)
-# pairscatter_colorcoded(data[data['Source'] == 'New'], x='Perplexity', y='T(30)', color_col='Theta')
-# sns.kdeplot(data=data[data['Source'] == 'New'], x='T(30)', fill=True)
-# plt.show()
+plot_feature_importance(model_T30_full, feature_names=features, fontsize=12)
 
 
-model_T300_full = train_decision_tree(data, source=None, features=features, target='T(300)', max_depth_input=7, min_samples_leaf_input=7)
-plot_decision_tree(model_T300_full, feature_names=features, max_depth_plot=7)
+model_T30_old = train_decision_tree(data, source='Old', features=features_split, target='T(30)', max_depth_input=4, min_samples_leaf_input=10)
+plot_decision_tree(model_T30_old, feature_names=features_split, max_depth_plot=7, title = "Regression tree of T(30) \n Pretreatment 1", fontsizetitle=15)
+plot_feature_importance(model_T30_old, feature_names=features, fontsize=12)
 
-model_runtime_full = train_decision_tree(data, source=None, features=features, target='Runtime (sec)', max_depth_input=5, min_samples_leaf_input=30)
+
+model_T30_new = train_decision_tree(data, source='New', features=features_split, target='T(30)', max_depth_input=4, min_samples_leaf_input=15)
+plot_decision_tree(model_T30_new, feature_names=features_split, max_depth_plot=7, title = "T(30) tree model (2)", fontsizetitle=15)
+plot_feature_importance(model_T30_new, feature_names=features, fontsize=12)
+analyze_residuals(model_T30_new, X = data[data['Source']=='New'][features_split], y=data[data['Source']=='New']['T(30)'])
+
+
+
+model_Stress_full = train_decision_tree(data, source=None, features=features, target='Stress', max_depth_input=7, min_samples_leaf_input=25)
+plot_decision_tree(model_Stress_full, feature_names=features, max_depth_plot=7)
+plot_feature_importance(model_Stress_full, feature_names=features, fontsize=12)
+analyze_residuals(model_Stress_full, X = data[features], y=data['Stress'])
+
+
+model_runtime_full = train_decision_tree(data, source=None, features=features, target='Runtime (sec)', max_depth_input=5, min_samples_leaf_input=25)
 plot_decision_tree(model_runtime_full, feature_names=features, max_depth_plot=7)
-
+plot_feature_importance(model_runtime_full, feature_names=features, fontsize=12)
+analyze_residuals(model_Stress_full, X = data[features], y=data['Stress'])
 
 
 

@@ -909,15 +909,16 @@ theta_new_limit = 0.25
 
 corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Perplexity'] < 40)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
 corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Perplexity'] < 40)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
-corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Perplexity'] >= 40)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
+corr_with_pvalues(df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Perplexity'] >= 126)].drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
 
 corr_with_pvalues(df_merged_clean.drop(columns=['Source', 'Combination', 'Runtime (min)'], inplace=False))
 
 plot_scatter_with_regression(
-    df_merged_clean,
+    df_merged_clean[(df_merged_clean['Source'] == 'New')],
     parameters,
-    ['Stress'],
-    color_by='Source')
+    ['T(30)'],
+    color_by='Source',
+    figsize=(10,5))
 
 plot_scatter_with_regression(
     df_merged_clean,
@@ -926,15 +927,15 @@ plot_scatter_with_regression(
     color_by='Source')
 
 pairscatter_colorcoded(
-    df_merged_clean[(df_merged_clean['Source'] == 'New')],
-    'Final momentum', 'T(300)',
-    color_col='Perplexity'
+    df_merged_clean[df_merged_clean['Source'] == 'Old'],
+    'Perplexity', 'Stress',
+    color_col='Initial momentum'
 )
 
 pairscatter_colorcoded(
     df_merged_clean,
-    'Perplexity', 'T(30)',
-    color_col='Theta'
+    'Perplexity', 'Stress',
+    color_col='Final momentum'
 )
 
 
@@ -979,13 +980,19 @@ df_merged_clean[(df_merged_clean['Source'] == 'Old') & (df_merged_clean['Theta']
 df_merged_clean[(df_merged_clean['Source'] == 'New') & (df_merged_clean['Theta'] >=0.45)]['Theta'].agg(['mean', 'count'])
 
 
-analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_list=['T(300)', 'Stress'],
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_list=['T(300)', 'Stress', 'T(30)'],
                                   perplexity_col='Perplexity',
                                   perplexity_bins_old=[0,50,155],
                                   perplexity_bins_new=[0,50,155],
-                                  figsize=(12,8))
+                                  figsize=(15,10))
 
-analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_list=['T(30)'],
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_list=['Stress'],
+                                  perplexity_col='Final momentum',
+                                  perplexity_bins_old=[0.8,0.85,0.9,1],
+                                  perplexity_bins_new=[0.8,0.85,0.9,1],
+                                  figsize=(15,10))
+
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_list=['KL'],
                                   perplexity_col='Perplexity',
                                   perplexity_bins_old=[0,50,155],
                                   perplexity_bins_new=[0,50,155],
@@ -994,8 +1001,8 @@ analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_
 
 analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['T(30)'],
                                   perplexity_col='Perplexity',
-                                  perplexity_bins_old=[0,50,155],
-                                  perplexity_bins_new=[0,50,155],
+                                  perplexity_bins_old=[32,67,155],
+                                  perplexity_bins_new=[32,67, 155],
                                   figsize=(10,5),
                                   font_size=14)
 
@@ -1067,7 +1074,7 @@ interaction_plot(
     #x2_bins=[0, 50, 155])
 
 
-sns.kdeplot(df_merged_clean[df_merged_clean['Source'] == 'Old']['Runtime (sec)'])
+sns.kdeplot(df_merged_clean['Perplexity'])
 plt.show()
 
 df_merged_clean[df_merged_clean['Source'] == 'Old'].drop(columns=['Runtime (min)', 'Source', 'Combination']).corr()

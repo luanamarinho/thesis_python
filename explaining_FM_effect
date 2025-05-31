@@ -1,0 +1,18 @@
+My intuition is to analyze this considering levels of perplexity, because this is the decisive parameter in all these performance metrics. When I amplify the updates (increasing final momentum), up to a certain point (the max value in the dataset), it might affect KL, but not statistically. But we have to remember that the gradient of KL is asymmetric, meaning that mismatches of distant neighbors in the input are not heavily penalized. So, whether distant neighbors are represent as close or distant points, that really doesn't matter. It doesn't affect KL that much (perhaps not significantly). 
+
+
+Low(er) perplexities induce narrow(er) Guassian kernels to present the input similarities. Taking a "geometric" perspective, narrower Gaussians are hard(er) to match with heavy tailed t-student distributions. In my understanding, even for very close neighbors, pij in the input would be higher than qij, for the same distances. Let's keep this in mind. Now let's think about the formula of the updates. We know that, for each point, the gradient of the KL depends on the differences between probabilities (pij - qij) and the direction of the vector difference (yi - yj).And the updates work in the way of approximating points to their close (true) neighbors while pushing them away from their distance (true) neighbors. And we know that perplexity also sets the number of evaluated pij. Therefore, in low perplexity settings, the updates (and location) of each data point will be defined by its very close, immediate neighbors only.
+
+So I think that, in low perplexities, the updates might work well to keep fairly good consistence between pairwise distances for these close neighbors, comparing input to output spaces. So, that's why we can have high KL, and yet, low stress and high(er) T(30). The distances between close neighbors were fairly well preserved, so that local data structure was preserved, and the distortions between pairwise distances was also lower, despite the greater disparity between pij and qij (so higher KL).
+
+Now, let's think about T300. In tSNE, global structure is formed as a by-product from the formation of local structure. For lower perplexities, this global organization becomes more vulnerable. That's why low perplexities are associated with lower T300.
+
+Now the role of final momentum, despite perplexity. Final momentum is only applied after early exageration is removed. Also, at this stage, the learning rate actually increases (N/early exaggeration), while differences between (pij - qij) would tend to become smaller (as compared to the early exaggeration phase). So final momentum increases the magnitude of the updates
+
+In the case of low perplexities, this works, in terms of adjusting locations (so distances), to yield decreasing immediate NN distance distortions. This apparently come at the expense of degenerating  global topology representation even further (so decreasing T300). Now T30. Why does it decrease T30 at low perplexities?
+
+Let's think now of high perplexities
+
+
+
+
