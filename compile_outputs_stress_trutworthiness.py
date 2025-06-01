@@ -963,13 +963,13 @@ plot_scatter_with_regression(
 
 pairscatter_colorcoded(
     df_merged_clean[df_merged_clean['Source'] == 'New'],
-    'Perplexity', 'T(30)',
-    color_col='Theta'
+    'Final momentum', 'T(300)',
+    color_col='Perplexity'
 )
 
 pairscatter_colorcoded(
     df_merged_clean[df_merged_clean['Source'] == 'Old'],
-    'Perplexity', 'T(30)',
+    'Perplexity', 'T(300)',
     color_col='Theta'
 )
 
@@ -1041,12 +1041,20 @@ analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Final momentum', y_
                                   figsize=(12,8))
 
 
-analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['T(30)'],
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['T(30)', 'T(300)'],
                                   perplexity_col='Perplexity',
-                                  perplexity_bins_old=[0,40,155],
-                                  perplexity_bins_new=[0,40,155],
-                                  figsize=(10,5),
+                                  perplexity_bins_old=[0,50,155],
+                                  perplexity_bins_new=[0,50,155],
+                                  figsize=(12,8),
                                   font_size=14)
+
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['T(30)', 'T(300)'],
+                                  perplexity_col='Perplexity',
+                                  perplexity_bins_old=[0,50,155],
+                                  perplexity_bins_new=[0,50,155],
+                                  figsize=(12,8),
+                                  font_size=14)
+
 
 analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Early exaggeration', y_list=['T(30)', 'T(300)'],
                                   perplexity_col='Perplexity',
@@ -1167,8 +1175,8 @@ df_merged_clean[df_merged_clean['Source'] == 'Old'].drop(columns=['Runtime (min)
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
 x = 'Perplexity'
-y = 'T(30)'
-color_col = 'Early exaggeration'
+y = 'T(300)'
+color_col = 'Final momentum'
 
 # Left plot (Old data)
 sns.scatterplot(

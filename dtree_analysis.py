@@ -302,13 +302,24 @@ plot_feature_importance(model_T30_new, feature_names=features_split, fontsize=12
 analyze_residuals(model_T30_new, X = data[data['Source']=='New'][features_split], y=data[data['Source']=='New']['T(30)'])
 
 
+model_T300_old = train_decision_tree(data, source='Old', features=features_split, target='T(300)', max_depth_input=4, min_samples_leaf_input=20)
+plot_decision_tree(model_T300_old, feature_names=features_split, max_depth_plot=7, title = "T(300) regression tree \n Pretreatment 1", fontsizetitle=15)
+plot_feature_importance(model_T300_old, feature_names=features_split, fontsize=12)
+analyze_residuals(model_T300_old, X = data[data['Source']=='Old'][features_split], y=data[data['Source']=='Old']['T(300)'])
+
+model_T300_new = train_decision_tree(data, source='New', features=features_split, target='T(300)', max_depth_input=4, min_samples_leaf_input=15)
+plot_decision_tree(model_T300_new, feature_names=features_split, max_depth_plot=7, title = "T(300) regression tree \n Pretreatment 2", fontsizetitle=15)
+plot_feature_importance(model_T300_new, feature_names=features_split, fontsize=12)
+analyze_residuals(model_T300_new, X = data[data['Source']=='New'][features_split], y=data[data['Source']=='New']['T(300)'])
+
+
 model_Stress_full = train_decision_tree(data, source=None, features=features, target='Stress', max_depth_input=7, min_samples_leaf_input=25)
-plot_decision_tree(model_Stress_full, feature_names=features, max_depth_plot=7)
+plot_decision_tree(model_Stress_full, feature_names=features, max_depth_plot=7, title='Stress regression tree')
 plot_feature_importance(model_Stress_full, feature_names=features, fontsize=12)
 analyze_residuals(model_Stress_full, X = data[features], y=data['Stress'])
 
 
-model_runtime_full = train_decision_tree(data, source=None, features=features, target='Runtime (sec)', max_depth_input=5, min_samples_leaf_input=25)
+model_runtime_full = train_decision_tree(data, source=None, features=features, target='Runtime (sec)', max_depth_input=5, min_samples_leaf_input=30)
 plot_decision_tree(model_runtime_full, feature_names=features, max_depth_plot=7)
 plot_feature_importance(model_runtime_full, feature_names=features, fontsize=12)
 analyze_residuals(model_runtime_full, X = data[features], y=data['Runtime (sec)'])
