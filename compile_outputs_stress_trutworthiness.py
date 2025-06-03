@@ -973,11 +973,7 @@ pairscatter_colorcoded(
     color_col='Theta'
 )
 
-pairscatter_colorcoded(
-    df_merged_clean,
-    'Perplexity', 'KL',
-    color_col='Source'
-)
+
 
 
 corr_plot(corr_data=cor_df_old, significant=significant_old, figsize=(12, 8), fontsize=12, rotation_x_tick=0)
@@ -1048,12 +1044,13 @@ analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['T(
                                   figsize=(12,8),
                                   font_size=14)
 
-analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['T(30)', 'T(300)'],
+analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Theta', y_list=['Stress', 'Runtime (sec)'],
                                   perplexity_col='Perplexity',
                                   perplexity_bins_old=[0,50,155],
                                   perplexity_bins_new=[0,50,155],
                                   figsize=(12,8),
                                   font_size=14)
+
 
 
 analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Early exaggeration', y_list=['T(30)', 'T(300)'],
@@ -1068,13 +1065,6 @@ analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Perplexity', y_list
                                   perplexity_col='Theta',
                                   perplexity_bins_old=[0,0.45,1.5],
                                   perplexity_bins_new=[0,0.45,1.5],
-                                  figsize=(10,5),
-                                  font_size=14)
-
-analyze_correlation_by_perplexity(data=df_merged_clean, x = 'Runtime (sec)', y_list=['Theta'],
-                                  perplexity_col='Perplexity',
-                                  perplexity_bins_old=[0,50,155],
-                                  perplexity_bins_new=[0,50,155],
                                   figsize=(10,5),
                                   font_size=14)
 
@@ -1174,9 +1164,9 @@ df_merged_clean[df_merged_clean['Source'] == 'Old'].drop(columns=['Runtime (min)
 # Create figure with two subplots
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
-x = 'Perplexity'
-y = 'T(300)'
-color_col = 'Final momentum'
+x = 'Theta'
+y = 'Runtime (sec)'
+color_col = 'Perplexity'
 
 # Left plot (Old data)
 sns.scatterplot(
