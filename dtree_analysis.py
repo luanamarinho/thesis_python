@@ -326,6 +326,4 @@ analyze_residuals(model_runtime_full, X = data[features], y=data['Runtime (sec)'
 
 
 
-
-
 data[data['Source']=='New']['KL'].describe()
